@@ -3,8 +3,8 @@ job "jenkins-java" {
   priority = 100
   type = "service"
   constraint {
-    attribute = "${attr.kernel.name}"
-    value     = "linux"
+    attribute = "${attr.cpu.arch}"
+    value     = "arm64"
   }
   update {
     max_parallel = 1
@@ -20,9 +20,16 @@ job "jenkins-java" {
   group "jenkins" {
     count = 1
 
+    volume "casc" {
+      type = "host"
+      read_only = false
+      source = "jenkins_casc"
+    }
+
     network {
       port "server" {
         static = 8080
+        to = 80
       }
     }
 
@@ -51,6 +58,7 @@ job "jenkins-java" {
         hook = "prestart"
         sidecar = false
       }
+
       artifact {
         source = "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.9.0/jenkins-plugin-manager-2.9.0.jar"
         destination = "local/jenkins-plugin-manager.jar"
@@ -62,26 +70,6 @@ job "jenkins-java" {
         args = ["-c", "mkdir -vp /usr/share/jenkins/ref/plugins ; java -jar local/jenkins-plugin-manager.jar -p blueocean blueocean-commons blueocean-config blueocean-core-js blueocean-dashboard blueocean-display-url blueocean-events blueocean-git-pipeline blueocean-github-pipeline blueocean-i18n blueocean-jwt blueocean-personalization blueocean-pipeline-api-impl blueocean-pipeline-editor blueocean-pipeline-scm-api blueocean-rest blueocean-rest-impl blueocean-web branch-api configuration-as-code credentials  credentials-binding dashboard-view display-url-api durable-task github github-api github-autostatus github-branch-source greenballs hashicorp-vault-pipeline hashicorp-vault-plugin job-dsl metrics monitoring pipeline-build-step pipeline-github pipeline-github-lib pipeline-githubnotify-step pipeline-graph-analysis pipeline-milestone-step pipeline-model-api pipeline-model-definition pipeline-model-extensions pipeline-rest-api pipeline-stage-step pipeline-stage-tags-metadata pipeline-stage-view pipeline-utility-steps trilead-api workflow-api workflow-basic-steps workflow-cps workflow-cps-global-lib workflow-durable-task-step workflow-job workflow-multibranch workflow-scm-step workflow-step-api workflow-support"]
       }
     }
-    // task "install-plugins" {
-    //   lifecycle {
-    //     hook = "prestart"
-    //     sidecar = false
-    //   }
-    //   driver = "java"
-    //   artifact {
-    //     source = "https://github.com/jenkinsci/plugin-installation-manager-tool/releases/download/2.9.0/jenkins-plugin-manager-2.9.0.jar"
-    //     destination = "local/jenkins-plugin-manager.jar"
-    //     mode = "file"
-    //   }
-    //   config {
-    //     jar_path = "local/jenkins-plugin-manager.jar"
-    //     args = ["-p", "blueocean blueocean-commons blueocean-config blueocean-core-js blueocean-dashboard blueocean-display-url blueocean-events blueocean-git-pipeline blueocean-github-pipeline blueocean-i18n blueocean-jwt blueocean-personalization blueocean-pipeline-api-impl blueocean-pipeline-editor blueocean-pipeline-scm-api blueocean-rest blueocean-rest-impl blueocean-web branch-api credentials  credentials-binding dashboard-view display-url-api durable-task github github-api github-autostatus github-branch-source greenballs hashicorp-vault-pipeline hashicorp-vault-plugin job-dsl metrics monitoring pipeline-build-step pipeline-github pipeline-github-lib pipeline-githubnotify-step pipeline-graph-analysis pipeline-milestone-step pipeline-model-api pipeline-model-definition pipeline-model-extensions pipeline-rest-api pipeline-stage-step pipeline-stage-tags-metadata pipeline-stage-view pipeline-utility-steps trilead-api workflow-api workflow-basic-steps workflow-cps workflow-cps-global-lib workflow-durable-task-step workflow-job workflow-multibranch workflow-scm-step workflow-step-api workflow-support"]
-    //   }
-    //   resources {
-    //     cpu    = 3500 # 500 MHz
-    //     memory = 2048 # 256MB
-    //   }
-    // }
     task "jenkins-controller" {
       driver = "java"
       config {
@@ -91,13 +79,22 @@ job "jenkins-java" {
       artifact {
         source = "https://get.jenkins.io/war-stable/2.277.1/jenkins.war"
       }
+
       logs {
         max_files     = 10
         max_file_size = 15
       }
+      volume_mount {
+        volume = "casc"
+        destination = "/jenkins_casc"
+        read_only = true
+      }
+      env {
+        CASC_JENKINS_CONFIG = "/jenkins_casc/jenkins.yml"
+      }
       csi_plugin {
         id = "jenkins_home"
-        type = "monolith"
+        type = "node"
         mount_dir = "/csi"
       }
       resources {
