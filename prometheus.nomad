@@ -13,7 +13,6 @@ job "prometheus" {
     network {
       port "prometheus_ui" {
         static = 9090
-        to     = 9090
       }
     }
 
@@ -40,6 +39,25 @@ job "prometheus" {
 
       template {
         change_mode = "noop"
+        destination = "local/webserver_alert.yml"
+
+        data = <<EOH
+---
+groups:
+- name: prometheus_alerts
+  rules:
+  - alert: Webserver down
+    expr: absent(up{job="webserver"})
+    for: 10s
+    labels:
+    severity: critical
+    annotations:
+        description: "Our webserver is down."
+    EOH
+      }
+
+      template {
+        change_mode = "noop"
         destination = "local/prometheus.yml"
 
         data = <<EOH
@@ -49,18 +67,20 @@ global:
   evaluation_interval: 5s
 
 scrape_configs:
-
+  - job_name: 'instance_metrics'
+    static_configs:
+      - targets:
+          {{ range nodes }}
+          - {{ .Address}}:9100
+          {{ end }}
   - job_name: 'nomad_metrics'
-
     consul_sd_configs:
-    - server: '{{ env "NOMAD_IP_prometheus_ui" }}:8500'
+    - server: '{{ env "CONSUL_HTTP_ADDR" }}'
       services: ['nomad-client', 'nomad']
-
     relabel_configs:
     - source_labels: ['__meta_consul_tags']
       regex: '(.*)http(.*)'
       action: keep
-
     scrape_interval: 5s
     metrics_path: /v1/metrics
     params:
