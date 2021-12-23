@@ -4,7 +4,7 @@ job "prometheus" {
 
   constraint {
     attribute = "${attr.cpu.modelname}"
-    value     = "ARMv7 Processor rev 3 (v7l)"
+    value     = "ARMv7 Processor rev 4 (v7l)"
   }
 
   group "monitoring" {
