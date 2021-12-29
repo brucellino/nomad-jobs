@@ -1,117 +1,23 @@
-# There can only be a single job definition per file. This job is named
-# "example" so it will create a job with the ID and Name "example".
-
-# The "job" stanza is the top-most configuration option in the job
-# specification. A job is a declarative specification of tasks that Nomad
-# should run. Jobs have a globally unique name, one or many task groups, which
-# are themselves collections of one or many tasks.
-#
-# For more information and examples on the "job" stanza, please see
-# the online documentation at:
-#
-#     https://www.nomadproject.io/docs/job-specification/job
-#
 job "cache" {
-  # The "region" parameter specifies the region in which to execute the job.
-  # If omitted, this inherits the default region name of "global".
-  # region = "global"
-  #
-  # The "datacenters" parameter specifies the list of datacenters which should
-  # be considered when placing this task. This must be provided.
   datacenters = ["dc1"]
-
-  # The "type" parameter controls the type of job, which impacts the scheduler's
-  # decision on placement. This configuration is optional and defaults to
-  # "service". For a full list of job types and their differences, please see
-  # the online documentation.
-  #
-  # For more information, please see the online documentation at:
-  #
-  #     https://www.nomadproject.io/docs/schedulers
-  #
   type = "service"
-
-  # The "constraint" stanza defines additional constraints for placing this job,
-  # in addition to any resource or driver constraints. This stanza may be placed
-  # at the "job", "group", or "task" level, and supports variable interpolation.
-  #
-  # For more information and examples on the "constraint" stanza, please see
-  # the online documentation at:
-  #
-  #     https://www.nomadproject.io/docs/job-specification/constraint
-  #
   constraint {
      attribute = "${attr.kernel.name}"
      value     = "linux"
   }
-
   constraint {
     attribute = "${attr.cpu.arch}"
     value = "arm64"
   }
 
-  # The "update" stanza specifies the update strategy of task groups. The update
-  # strategy is used to control things like rolling upgrades, canaries, and
-  # blue/green deployments. If omitted, no update strategy is enforced. The
-  # "update" stanza may be placed at the job or task group. When placed at the
-  # job, it applies to all groups within the job. When placed at both the job and
-  # group level, the stanzas are merged with the group's taking precedence.
-  #
-  # For more information and examples on the "update" stanza, please see
-  # the online documentation at:
-  #
-  #     https://www.nomadproject.io/docs/job-specification/update
-  #
   update {
-    # The "max_parallel" parameter specifies the maximum number of updates to
-    # perform in parallel. In this case, this specifies to update a single task
-    # at a time.
     max_parallel = 1
-
-    # The "min_healthy_time" parameter specifies the minimum time the allocation
-    # must be in the healthy state before it is marked as healthy and unblocks
-    # further allocations from being updated.
     min_healthy_time = "10s"
-
-    # The "healthy_deadline" parameter specifies the deadline in which the
-    # allocation must be marked as healthy after which the allocation is
-    # automatically transitioned to unhealthy. Transitioning to unhealthy will
-    # fail the deployment and potentially roll back the job if "auto_revert" is
-    # set to true.
     healthy_deadline = "3m"
-
-    # The "progress_deadline" parameter specifies the deadline in which an
-    # allocation must be marked as healthy. The deadline begins when the first
-    # allocation for the deployment is created and is reset whenever an allocation
-    # as part of the deployment transitions to a healthy state. If no allocation
-    # transitions to the healthy state before the progress deadline, the
-    # deployment is marked as failed.
     progress_deadline = "10m"
-
-    # The "auto_revert" parameter specifies if the job should auto-revert to the
-    # last stable job on deployment failure. A job is marked as stable if all the
-    # allocations as part of its deployment were marked healthy.
     auto_revert = false
-
-    # The "canary" parameter specifies that changes to the job that would result
-    # in destructive updates should create the specified number of canaries
-    # without stopping any previous allocations. Once the operator determines the
-    # canaries are healthy, they can be promoted which unblocks a rolling update
-    # of the remaining allocations at a rate of "max_parallel".
-    #
-    # Further, setting "canary" equal to the count of the task group allows
-    # blue/green deployments. When the job is updated, a full set of the new
-    # version is deployed and upon promotion the old version is stopped.
-    canary = 0
+    canary = 1
   }
-  # The migrate stanza specifies the group's strategy for migrating off of
-  # draining nodes. If omitted, a default migration strategy is applied.
-  #
-  # For more information on the "migrate" stanza, please see
-  # the online documentation at:
-  #
-  #     https://www.nomadproject.io/docs/job-specification/migrate
-  #
   migrate {
     # Specifies the number of task groups that can be migrated at the same
     # time. This number must be less than the total count for the group as
@@ -132,54 +38,18 @@ job "cache" {
     # is specified using a label suffix like "2m" or "1h".
     healthy_deadline = "5m"
   }
-  # The "group" stanza defines a series of tasks that should be co-located on
-  # the same Nomad client. Any task within a group will be placed on the same
-  # client.
-  #
-  # For more information and examples on the "group" stanza, please see
-  # the online documentation at:
-  #
-  #     https://www.nomadproject.io/docs/job-specification/group
-  #
   group "cache" {
-    # The "count" parameter specifies the number of the task groups that should
-    # be running under this group. This value must be non-negative and defaults
-    # to 1.
-    count = 1
-
-    # The "network" stanza specifies the network configuration for the allocation
-    # including requesting port bindings.
-    #
-    # For more information and examples on the "network" stanza, please see
-    # the online documentation at:
-    #
-    #     https://www.nomadproject.io/docs/job-specification/network
-    #
+    count = 3
     network {
       port "db" {
         to = 6379
       }
     }
 
-    # The "service" stanza instructs Nomad to register this task as a service
-    # in the service discovery engine, which is currently Consul. This will
-    # make the service addressable after Nomad has placed it on a host and
-    # port.
-    #
-    # For more information and examples on the "service" stanza, please see
-    # the online documentation at:
-    #
-    #     https://www.nomadproject.io/docs/job-specification/service
-    #
     service {
       name = "redis-cache"
       tags = ["global", "cache"]
       port = "db"
-
-      # The "check" stanza instructs Nomad to create a Consul health check for
-      # this service. A sample check is provided here for your convenience;
-      # uncomment it to enable it. The "check" stanza is documented in the
-      # "service" stanza documentation.
 
       check {
        name     = "alive"
@@ -248,20 +118,15 @@ job "cache" {
     #
     #     https://www.nomadproject.io/docs/job-specification/affinity
     #
-    # affinity {
-    # attribute specifies the name of a node attribute or metadata
-    # attribute = "${node.datacenter}"
+    affinity {
+      attribute = "${node.datacenter}"
 
 
-    # value specifies the desired attribute value. In this example Nomad
-    # will prefer placement in the "us-west1" datacenter.
-    # value  = "us-west1"
+      value  = "dc1"
 
 
-    # weight can be used to indicate relative preference
-    # when the job has more than one affinity. It defaults to 50 if not set.
-    # weight = 100
-    #  }
+      weight = 100
+    }
 
 
     # The "spread" stanza allows operators to increase the failure tolerance of
@@ -344,10 +209,10 @@ job "cache" {
       #
       #     https://www.nomadproject.io/docs/job-specification/logs
       #
-      # logs {
-      #   max_files     = 10
-      #   max_file_size = 15
-      # }
+      logs {
+        max_files     = 10
+        max_file_size = 15
+      }
 
       # The "resources" stanza describes the requirements a task needs to
       # execute. Resource requirements include memory, cpu, and more.
