@@ -4,7 +4,7 @@ job "prometheus" {
 
   constraint {
     attribute = "${attr.cpu.modelname}"
-    value     = "ARMv7 Processor rev 4 (v7l)"
+    value     = "ARMv7 Processor rev 3 (v7l)"
   }
 
   group "monitoring" {
@@ -29,11 +29,11 @@ job "prometheus" {
 
     task "prometheus" {
       artifact {
-        source      = "https://github.com/prometheus/prometheus/releases/download/v2.28.1/prometheus-2.28.1.linux-armv7.tar.gz"
+        source      = "https://github.com/prometheus/prometheus/releases/download/v2.32.1/prometheus-2.32.1.linux-armv7.tar.gz"
         destination = "local"
 
         options {
-          checksum = "sha256:0ee31e4ee719680143887911dc15e9108ac595fe4345cb1bb959aad5f0281b1a"
+          checksum = "sha256:21d8a095f02b2986d408cff744e568ca66c92212b124673143b155a80284d2e4"
         }
       }
 
@@ -91,11 +91,14 @@ EOH
       driver = "raw_exec"
 
       config {
-        command = "local/prometheus-2.28.1.linux-armv7/prometheus"
+        command = "local/prometheus-2.32.1.linux-armv7/prometheus"
         args    = ["--config.file=local/prometheus.yml"]
       }
 
-      resources {}
+      resources {
+        cpu = 2000
+        memory = 2000
+      }
 
       service {
         name = "prometheus"
