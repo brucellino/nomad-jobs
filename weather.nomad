@@ -29,8 +29,8 @@ job "weather" {
       }
 
       resources {
-        cpu    = 50
-        memory = 250
+        cpu    = 256
+        memory = 128
       }
     }
   }
