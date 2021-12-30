@@ -9,7 +9,7 @@ job "vault-dev" {
   type        = "service"
 
   group "server" {
-    count = 3
+    count = 5
 
     network {
       port "api" {
@@ -39,25 +39,36 @@ job "vault-dev" {
         value     = "arm64"
       }
 
+      resources {
+        cpu    = 1000
+        memory = 512
+      }
+
       artifact {
-        source      = "https://releases.hashicorp.com/vault/1.7.3/vault_1.7.3_linux_arm64.zip"
+        source      = "https://releases.hashicorp.com/vault/1.9.2/vault_1.9.2_linux_arm64.zip"
         destination = "local/vault"
         mode        = "file"
       }
 
       template {
-        data = <<EOH
+        // source = "vault.hcl.tmpl"
+        data = <<EOT
 listener "tcp" {
-  address = "0.0.0.0:8200"
+  address = "{{ env "attr.unique.network.ip-address" }}:8200"
   tls_disable = true
 }
-api_addr = "http://127.0.0.1:8200"
-cluster_addr = "http://127.0.0.1:8201"
+api_addr = "http://{{ env "attr.unique.network.ip-address" }}:8200"
+cluster_addr = "http://{{ env "attr.unique.network.ip-address" }}:8201"
 
 storage "raft" {
-  path = "{{ env "NOMAD_ALLOC_DIR" }}/raft"
-  node_id = "${attr.unique.hostname}"
+  path = "{{ env "NOMAD_ALLOC_DIR" }}/raft/"
+  node_id = "{{ env "attr.unique.hostname" }}"
+
 }
+
+disable_mlock = true
+cluster_name = "hah"
+
 telemetry {
   disable_hostname = false
   prometheus_retention_time = "30s"
@@ -71,7 +82,8 @@ service_registration "consul" {
 
 ui = true
 log_format = "json"
-EOH
+
+EOT
 
         destination = "local/vault.d/vault.hcl"
       }
