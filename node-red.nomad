@@ -1,7 +1,7 @@
 job "nodered" {
   datacenters = ["dc1"]
   update {
-    max_parallel = 2
+    max_parallel = 1
     health_check = "checks"
     canary = 1
     auto_promote = true
@@ -13,17 +13,18 @@ job "nodered" {
     network {
       port "ui" {
         static = 1880
+        to = 9999
       }
     }
 
     service {
-      tags = ["automation", "nodered"]
+      tags = ["automation", "nodered", "urlprefix-/nodered"]
       port = "ui"
 
       check {
         type     = "http"
         port     = "ui"
-        path     = "/"
+        path     = "/nodered/"
         interval = "10s"
         timeout  = "5s"
       }
@@ -63,7 +64,7 @@ EOT
       }
 
       resources {
-        cpu  = 1000
+        cpu  = 250
         memory = 256
         memory_max = 512
       }
@@ -80,9 +81,39 @@ EOT
 #!/bin/bash
 source ${XDG_CONFIG_HOME}/nvm/nvm.sh
 nvm use 16
-node-red-pi --max-old-space-size=256
+node-red-pi --max-old-space-size=256 --settings settings.js
 EOT
         perms = "0755"
+      }
+
+      template {
+        destination = "settings.js"
+        data = <<EOT
+module.exports = {
+  uiPort: process.env.PORT || 1880,
+  httpAdminRoot: "/nodered",
+  httpStatic: '/nodered/node-red-static',
+  logging: {
+    console: {
+      level: "warn",
+      metrics: false,
+      audit: false,
+    }
+  },
+  editorTheme: {
+    theme: "solarized-dark",
+    codeEditor: {
+      lib: "monaco",
+      options: {
+        theme: "github",
+        fontSize: 20,
+        fontFamily: "Cascadia Code, Fira Code, Consolas, 'Courier New', monospace",
+        fontLigatures: true,
+      }
+    }
+  }
+}
+EOT
       }
       config {
         command = "/bin/bash"
@@ -90,7 +121,7 @@ EOT
       }
 
       resources {
-        cores = 2
+        cores = 1
         memory = 1024
         memory_max = 2048
       }
