@@ -1,13 +1,13 @@
 job "weather" {
   constraint {
     attribute = "${attr.unique.hostname}"
-    value     = "inky.station"
+    value     = "inky"
   }
 
   meta {
     team = "inky"
     sdk  = "python3"
-    ever = "5min"
+    every = "5min"
   }
 
   periodic {
@@ -31,6 +31,29 @@ job "weather" {
       resources {
         cpu    = 256
         memory = 128
+      }
+      service {
+        tags = ["weather"]
+        // port = "weather"
+        meta {
+          team = "inky"
+          sdk  = "python3"
+          every = "5min"
+        }
+        check {
+          type = "script"
+          name = "check_python"
+          command = "python3"
+          args = ["--version" ]
+          interval = "20s"
+          timeout = "5s"
+
+          check_restart {
+            limit = 3
+            grace = "90s"
+            ignore_warnings = false
+          }
+        }
       }
     }
   }
