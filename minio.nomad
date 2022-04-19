@@ -18,10 +18,19 @@ variable "secret_key" {
     type = string
 }
 
+variable "minio_storage_size"{
+    description = "Size of the minio storage"
+    type = number
+    default = 10737418204
+}
+
 job "minio" {
   datacenters = ["dc1"]
   type        = "service"
 
+  constraint {
+    distinct_hosts = true
+  }
 
   constraint {
     attribute = "${attr.cpu.arch}"
@@ -29,7 +38,7 @@ job "minio" {
   }
 
   group "deploy" {
-    count = 4
+    count = 1
     reschedule {
       attempts       = 1
       interval       = "24h"
@@ -72,7 +81,7 @@ job "minio" {
         destination = "${NOMAD_ALLOC_DIR}/minio"
         mode = "file"
         options {
-          checksum = "sha256:aa305e8147722b32873f6aa84ce9a5cce89746df893b530bb6c9fcefa4be8c2f"
+          checksum = "sha256:665f6690b630a7f7f5326dd3cbbf0647bbbc14c4a6cadbe7dfc919a23d727d56"
         }
       }
 
@@ -97,12 +106,24 @@ job "minio" {
       env {
         MINIO_ROOT_USER     = var.root_username
         MINIO_ROOT_PASSWORD = var.root_password
+        MINIO_VOLUMES="http://${attr.unique.hostname}/mnt/minio"
         // MINIO_ACCESS_KEY    = var.access_key
         // MINIO_SECRET_KEY    = var.secret_key
       }
 
+      resources {
+        cpu = 1200
+        memory = 512
+      }
+
+      constraint {
+        attribute = "${attr.unique.storage.bytesfree}"
+        operator = ">="
+        value = "${var.minio_storage_size}"
+      }
+
       service {
-        tags = ["minio", "s3", "api"]
+        tags = ["minio", "s3", "api", "urlprefix-/buckets"]
         port = "api"
 
         check {
