@@ -1,4 +1,10 @@
 job "weather" {
+
+   affinity {
+    attribute = "${attr.unique.hostname}"
+    value     = "inky"
+    weight    = 100
+  }
   constraint {
     attribute = "${attr.unique.hostname}"
     value     = "inky"
@@ -20,6 +26,11 @@ job "weather" {
   datacenters = ["dc1"]
 
   group "weather" {
+    ephemeral_disk {
+        migrate = true
+        size    = 100
+        sticky  = true
+      }
     task "weather" {
       driver = "raw_exec"
 
@@ -31,6 +42,11 @@ job "weather" {
       resources {
         cpu    = 256
         memory = 128
+      }
+
+      logs {
+        max_files     = 5
+        max_file_size = 5
       }
       service {
         tags = ["weather"]
