@@ -1,6 +1,5 @@
 job "fabio" {
   datacenters = ["dc1"]
-
   type = "system"
 
   group "fabio" {
@@ -16,19 +15,19 @@ job "fabio" {
 
     task "fabio" {
       artifact {
-        source      = "https://github.com/fabiolb/fabio/releases/download/v1.5.15/fabio-1.5.15-go1.15.5-linux_arm"
-        destination = "local/"
+        source      = "https://github.com/fabiolb/fabio/releases/download/v1.6.0/fabio-1.6.0-linux_${attr.cpu.arch}"
+        destination = "local/fabio"
+        mode = "file"
       }
 
       driver = "raw_exec"
 
       config {
-        command = "local/fabio-1.5.15-go1.15.5-linux_arm"
+        command = "local/fabio"
       }
 
       resources {
         cpu = 100
-
         memory = 64
       }
     }
