@@ -37,8 +37,15 @@ job "minio" {
     value     = "arm64"
   }
 
-  group "deploy" {
+  group "server" {
     count = 1
+    update {
+      max_parallel = 1
+      health_check = "checks"
+      canary = 1
+      auto_promote = true
+      auto_revert = true
+    }
     reschedule {
       attempts       = 1
       interval       = "24h"
@@ -48,11 +55,16 @@ job "minio" {
     }
 
     migrate {
-      max_parallel = 2
+      max_parallel = 1
       health_check = "checks"
       min_healthy_time = "10s"
       healthy_deadline = "10s"
+    }
 
+    volume "buckets" {
+      type = "host"
+      source=  "scratch"
+      read_only = false
     }
     restart {
 
@@ -63,52 +75,40 @@ job "minio" {
       }
 
       port "console" {
-        static = 38027
+        static = 9001
       }
 
       port "broker" {}
     }
 
-    task "stage" {
-      lifecycle {
-        hook = "prestart"
-        sidecar = false
-      }
-      driver = "raw_exec"
-
+    task "server" {
+      driver = "exec"
       artifact {
-        source = "https://dl.min.io/server/minio/release/linux-arm64/minio"
+        source = "https://dl.min.io/server/minio/release/linux-${attr.cpu.arch}/minio"
         destination = "${NOMAD_ALLOC_DIR}/minio"
         mode = "file"
-        options {
-          checksum = "sha256:665f6690b630a7f7f5326dd3cbbf0647bbbc14c4a6cadbe7dfc919a23d727d56"
-        }
+        // options {
+        //   checksum = "sha256:665f6690b630a7f7f5326dd3cbbf0647bbbc14c4a6cadbe7dfc919a23d727d56"
+        // }
       }
-
-      config {
-        command = "chmod"
-        args = ["+x", "${NOMAD_ALLOC_DIR}/minio"]
-
-      }
-
-      resources {
-        cpu = 1
-        memory = 512
-      }
-    }
-    task "run" {
-      driver = "raw_exec"
       config {
         command = "${NOMAD_ALLOC_DIR}/minio"
-        args    = ["server", "${attr.unique.hostname}/mnt/minio"]
+        args    = [
+          "server",
+          "--console-address=${NOMAD_ADDR_console}",
+          "${NOMAD_ALLOC_DIR}/data"]
+      }
+      volume_mount {
+        volume      = "buckets"
+        destination = "${NOMAD_ALLOC_DIR}/data"
       }
 
       env {
         MINIO_ROOT_USER     = var.root_username
         MINIO_ROOT_PASSWORD = var.root_password
-        MINIO_VOLUMES="http://${attr.unique.hostname}/mnt/minio"
-        // MINIO_ACCESS_KEY    = var.access_key
-        // MINIO_SECRET_KEY    = var.secret_key
+        MINIO_VOLUMES="http://${attr.unique.hostname}/${NOMAD_ALLOC_DIR}/data"
+        MINIO_ACCESS_KEY    = var.access_key
+        MINIO_SECRET_KEY    = var.secret_key
       }
 
       resources {
@@ -125,9 +125,9 @@ job "minio" {
       service {
         tags = ["minio", "s3", "api", "urlprefix-/buckets"]
         port = "api"
-
+        name = "minio-api"
         check {
-          name     = "node-liveness"
+          name     = "mino-healthy"
           type     = "http"
           port     = "api"
           method   = "GET"
@@ -139,6 +139,24 @@ job "minio" {
             limit = 2
             grace = "10s"
           }
+        }
+      }
+
+      service {
+        tags = ["minio", "s3", "console", "urlprefix-/minio-console"]
+        port = "console"
+        name = "minio-console"
+        check {
+          name     = "console-ready"
+          type     = "tcp"
+          port     = "console"
+          interval = "60s"
+          timeout  = "5s"
+
+        //   check_restart {
+        //     limit = 2
+        //     grace = "10s"
+        //   }
         }
       }
     }
