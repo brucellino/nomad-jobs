@@ -16,3 +16,10 @@ scrape_configs:
     labels:
       job: consul
       __path__: /var/log/consul*.log
+- job_name: system
+  static_configs:
+  - targets:
+      - localhost
+    labels:
+      job: nomad
+      __path__: /var/log/nomad*.log

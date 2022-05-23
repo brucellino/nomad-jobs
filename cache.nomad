@@ -1,6 +1,11 @@
 job "cache" {
   datacenters = ["dc1"]
   type = "service"
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
   constraint {
      attribute = "${attr.kernel.name}"
      value     = "linux"

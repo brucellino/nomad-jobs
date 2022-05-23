@@ -25,6 +25,11 @@ variable "minio_storage_size"{
 }
 
 job "minio" {
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
   datacenters = ["dc1"]
   type        = "service"
 

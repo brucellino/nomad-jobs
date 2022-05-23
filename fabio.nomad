@@ -1,7 +1,11 @@
 job "fabio" {
   datacenters = ["dc1"]
   type = "system"
-
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
   group "fabio" {
     network {
       port "lb" {
@@ -20,7 +24,7 @@ job "fabio" {
         mode = "file"
       }
 
-      driver = "raw_exec"
+      driver = "exec"
 
       config {
         command = "local/fabio"

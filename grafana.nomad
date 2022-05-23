@@ -1,60 +1,101 @@
-job "dashboard" {
-  datacenters = ["dc1"]
+variable "grafana_version" {
+  type = string
+  default = "8.5.0"
+  description = "Grafana version"
+}
 
+// locals {
+//   grafana_arm = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-armv6.tar.gz"
+//   grafana_64 = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-arm64.tar.gz"
+//   grafana_url = "${attr.cpu.arch == "arm64" ? local.grafana_64 : local.grafana_arm}"
+// }
+
+job "dashboard" {
+
+  datacenters = ["dc1"]
   type = "service"
 
   # Select ARMv7 machines
   constraint {
     attribute = "${attr.cpu.arch}"
     operator  = "="
-    value     = "arm"
+    value     = "arm64"
   }
 
   # select machines with more than 4GB of RAM
   constraint {
     attribute = "${attr.memory.totalbytes}"
-    value     = "2GB"
-    operator  = ">"
+    value     = "1GB"
+    operator  = ">="
   }
-
-  constraint {
-    attribute = "${node.class}"
-    value     = "32"
-  }
-
   update {
     max_parallel      = 1
     min_healthy_time  = "20s"
     healthy_deadline  = "7m"
     progress_deadline = "15m"
     auto_revert       = true
+    auto_promote = true
     canary            = 1
   }
 
   migrate {
-    max_parallel = 2
-
-    # Specifies the mechanism in which allocations health is determined. The
-    # potential values are "checks" or "task_states".
+    max_parallel = 1
     health_check = "checks"
-
-    # Specifies the minimum time the allocation must be in the healthy state
-    # before it is marked as healthy and unblocks further allocations from being
-    # migrated. This is specified using a label suffix like "30s" or "15m".
     min_healthy_time = "15s"
-
-    # Specifies the deadline in which the allocation must be marked as healthy
-    # after which the allocation is automatically transitioned to unhealthy. This
-    # is specified using a label suffix like "2m" or "1h".
     healthy_deadline = "5m"
   }
 
-  group "server" {
+  group "db" {
     count = 1
+    network {
+      port "mysql_server" {
+        to = 3306
+      }
+    }
+    service {
+      name = "mysql"
+      tags = ["db", "dashboard"]
+      port = "mysql_server"
 
+      check {
+        type = "tcp"
+        port = "mysql_server"
+        name = "mysql_alive"
+        interval = "20s"
+        timeout = "2s"
+      }
+    }
+
+    restart {
+      attempts = 1
+      interval = "2m"
+      delay = "15s"
+      mode = "fail"
+    }
+    task "mysql" {
+      driver = "docker"
+      config {
+        image = "arm64v8/mysql:oracle"
+        ports = ["mysql_server"]
+      }
+      env {
+        MYSQL_ROOT_PASSWORD = "password" # pragma: allowlist secret
+        MYSQL_USER = "mysql"
+        MYSQL_PASSWORD = "password" # pragma: allowlist secret
+      }
+      resources {
+        cpu    = 125
+        memory = 512
+      }
+    }
+  }
+
+
+  group "grafana" {
+    count = 1
     network {
       port "grafana_server" {
-        to = 3000
+        static = 3000
       }
     }
 
@@ -63,143 +104,71 @@ job "dashboard" {
       tags = ["monitoring", "dashboard"]
       port = "grafana_server"
 
-      # The "check" stanza instructs Nomad to create a Consul health check for
-      # this service. A sample check is provided here for your convenience;
-      # uncomment it to enable it. The "check" stanza is documented in the
-      # "service" stanza documentation.
-
       check {
-        name     = "api"
+        port = "grafana_server"
+        name     = "grafana-api"
         path     = "/api/health"
-        type     = "tcp"
+        type     = "http"
         interval = "20s"
         timeout  = "5s"
       }
     }
 
     restart {
-      # The number of attempts to run the job within the specified interval.
-      attempts = 2
-      interval = "10m"
-
-      # The "delay" parameter specifies the duration to wait before restarting
-      # a task after it has failed.
+      attempts = 1
+      interval = "2m"
       delay = "15s"
-
-      # The "mode" parameter controls what happens when a task has restarted
-      # "attempts" times within the interval. "delay" mode delays the next
-      # restart until the next interval. "fail" mode does not restart the task
-      # if "attempts" has been hit within the interval.
       mode = "fail"
     }
 
-    # The "ephemeral_disk" stanza instructs Nomad to utilize an ephemeral disk
-    # instead of a hard disk requirement. Clients using this stanza should
-    # not specify disk requirements in the resources stanza of the task. All
-    # tasks in this group will share the same ephemeral disk.
-    #
-    # For more information and examples on the "ephemeral_disk" stanza, please
-    # see the online documentation at:
-    #
-    #     https://www.nomadproject.io/docs/job-specification/ephemeral_disk
-    #
     ephemeral_disk {
-      # When sticky is true and the task group is updated, the scheduler
-      # will prefer to place the updated allocation on the same node and
-      # will migrate the data. This is useful for tasks that store data
-      # that should persist across allocation updates.
-      # sticky = true
-      #
-      # Setting migrate to true results in the allocation directory of a
-      # sticky allocation directory to be migrated.
-      # migrate = true
-      #
-      # The "size" parameter specifies the size in MB of shared ephemeral disk
-      # between tasks in the group.
       size = 300
     }
-
-    affinity {
-      attribute = "${node.datacenter}"
-      value     = "dc1"
-      weight    = 100
-    }
-
-    # The "spread" stanza allows operators to increase the failure tolerance of
-    # their applications by specifying a node attribute that allocations
-    # should be spread over.
-    #
-    # For more information and examples on the "spread" stanza, please
-    # see the online documentation at:
-    #
-    #     https://www.nomadproject.io/docs/job-specification/spread
-    #
-    # spread {
-    # attribute specifies the name of a node attribute or metadata
-    # attribute = "${node.datacenter}"
-
-
-    # targets can be used to define desired percentages of allocations
-    # for each targeted attribute value.
-    #
-    #   target "us-east1" {
-    #     percent = 60
-    #   }
-    #   target "us-west1" {
-    #     percent = 40
-    #   }
-    #  }
-
-    # The "task" stanza creates an individual unit of work, such as a Docker
-    # container, web application, or batch processing.
-    #
-    # For more information and examples on the "task" stanza, please see
-    # the online documentation at:
-    #
-    #     https://www.nomadproject.io/docs/job-specification/task
-    #
     task "grafana" {
-      # The "driver" parameter specifies the task driver that should be used to
-      # run the task.
-      driver = "raw_exec"
-
-      artifact {
-        source = "https://dl.grafana.com/oss/release/grafana-8.3.3.linux-armv7.tar.gz"
-
-        options {
-          checksum = "sha256:9abddf9be0b5c4e7086676a1de5289fd4fc08faec3c27b653811535c4f0fc9fa"
-        }
-      }
-
+      driver = "exec"
       logs {
         max_files     = 10
         max_file_size = 15
       }
-
+      artifact {
+        // source = local.grafana_url
+        source = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-arm64.tar.gz"
+        destination = "${NOMAD_ALLOC_DIR}"
+      }
       resources {
-        cpu    = 1500
-        memory = 2048
+        cpu    = 1000
+        memory = 1024
       }
 
       config {
-        command = "local/grafana-8.3.3/bin/grafana-server"
-        args    = ["-homepath=local/grafana-8.3.3", "--config=local/conf.ini"]
+        command = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/bin/grafana-server"
+        args = [
+          "-homepath=${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}",
+          "-config=${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
+        ]
       }
 
       template {
         data = <<EOT
+[auth.anonymous]
+enabled = true
+[database]
+type = mysql
+host = "mysql:${NOMAD_HOST_PORT_mysql}"
+user = root
+password = """password"""
 [paths]
-data = local/data/
-logs = local/log/
-plugins = local/plugins
+data = ${NOMAD_ALLOC_DIR}/data/
+logs = ${NOMAD_ALLOC_DIR}/log/
+plugins = ${NOMAD_ALLOC_DIR}/plugins
 [analytics]
 reporting_enabled = false
 [snapshots]
 external_enabled = false
 EOT
 
-        destination = "local/conf.ini"
-      }
-    }
-  }
+        destination = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
+      } // Configuration template
+    } // Grafana server task
+  } // grafana server group
 }
