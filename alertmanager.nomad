@@ -2,7 +2,11 @@ job "alertmanager" {
   datacenters = ["dc1"]
 
   type = "service"
-
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
   group "alerting" {
     count = 1
 

@@ -12,6 +12,11 @@
 #     https://www.nomadproject.io/docs/job-specification/job
 #
 job "promtail" {
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
   datacenters = ["dc1"]
   type = "system"
   // constraint {
@@ -74,15 +79,15 @@ job "promtail" {
       }
 
       artifact {
-         source = "http://minio-deploy-run.service.consul:9000/loki-bin/promtail-linux-${attr.cpu.arch}.zip"
+         source = "http://minio-api.service.consul:9000/loki-bin/promtail-linux-${attr.cpu.arch}.zip"
          destination = "local/promtail"
          mode = "file"
       }
 
 
       resources {
-        cpu    = 500 # 500 MHz
-        memory = 256 # 256MB
+        cpu    = 60 # 500 MHz
+        memory = 125 # 256MB
       }
 
 

@@ -1,10 +1,25 @@
 job "prometheus" {
   datacenters = ["dc1"]
   type        = "service"
-
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
+  update {
+    max_parallel = 1
+    health_check = "checks"
+    canary = 1
+    auto_promote = true
+    auto_revert = true
+  }
+  #vault {
+  #      policies = ["nomad-monitoring"]
+  #      // entity_alias = "prometheus"
+  #}
   constraint {
-    attribute = "${attr.cpu.modelname}"
-    value     = "ARMv7 Processor rev 3 (v7l)"
+     attribute = attr.cpu.arch
+     value     = "arm64"
   }
 
   group "monitoring" {
@@ -17,9 +32,9 @@ job "prometheus" {
     }
 
     restart {
-      attempts = 1
+      attempts = 2
       interval = "5m"
-      delay    = "15s"
+      delay    = "1m"
       mode     = "fail"
     }
 
@@ -29,33 +44,13 @@ job "prometheus" {
 
     task "prometheus" {
       artifact {
-        source      = "https://github.com/prometheus/prometheus/releases/download/v2.32.1/prometheus-2.32.1.linux-armv7.tar.gz"
+        source      = "https://github.com/prometheus/prometheus/releases/download/v2.35.0/prometheus-2.35.0.linux-arm64.tar.gz"
         destination = "local"
 
         options {
-          checksum = "sha256:21d8a095f02b2986d408cff744e568ca66c92212b124673143b155a80284d2e4"
+          checksum = "sha256:3ebe0c533583a9ab03363a80aa629edd8e0cc42da3583e33958eb7abe74d4cd2"
         }
       }
-
-      template {
-        change_mode = "noop"
-        destination = "local/webserver_alert.yml"
-
-        data = <<EOH
----
-groups:
-- name: prometheus_alerts
-  rules:
-  - alert: Webserver down
-    expr: absent(up{job="webserver"})
-    for: 10s
-    labels:
-    severity: critical
-    annotations:
-        description: "Our webserver is down."
-    EOH
-      }
-
       template {
         change_mode = "noop"
         destination = "local/prometheus.yml"
@@ -67,6 +62,15 @@ global:
   evaluation_interval: 5s
 
 scrape_configs:
+  - job_name: vault
+    metrics_path: /v1/sys/metrics
+    params:
+      format: ['prometheus']
+    scheme: http
+    authorization:
+      credentials: '"${env["VAULT_TOKEN"]}"'
+    static_configs:
+      - targets: ['192.168.1.16:8200']
   - job_name: 'instance_metrics'
     static_configs:
       - targets:
@@ -76,7 +80,12 @@ scrape_configs:
   - job_name: 'nomad_metrics'
     consul_sd_configs:
     - server: '{{ env "CONSUL_HTTP_ADDR" }}'
-      services: ['nomad-client', 'nomad']
+      services:
+        - 'nomad-client'
+        - 'nomad'
+        - 'consul'
+        - 'minio-api'
+        - 'minio-console'
     relabel_configs:
     - source_labels: ['__meta_consul_tags']
       regex: '(.*)http(.*)'
@@ -88,27 +97,30 @@ scrape_configs:
 EOH
       }
 
-      driver = "raw_exec"
+      driver = "exec"
 
       config {
-        command = "local/prometheus-2.32.1.linux-armv7/prometheus"
-        args    = ["--config.file=local/prometheus.yml"]
+        command = "local/prometheus-2.35.0.linux-arm64/prometheus"
+        args    = [
+          "--config.file=local/prometheus.yml",
+          "--web.external-url=http://0.0.0.0:9090/prometheus"
+          ]
       }
 
       resources {
-        cpu = 2000
-        memory = 2000
+        cpu = 1000
+        memory = 800
       }
 
       service {
         name = "prometheus"
-        tags = ["urlprefix-/"]
+        tags = ["urlprefix-/prometheus"]
         port = "prometheus_ui"
 
         check {
           name     = "prometheus_ui port alive"
           type     = "http"
-          path     = "/-/healthy"
+          path     = "prometheus/-/healthy"
           interval = "10s"
           timeout  = "2s"
         }

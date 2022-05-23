@@ -1,5 +1,10 @@
 job "nodered" {
   datacenters = ["dc1"]
+  meta {
+    auto-backup = true
+    backup-schedule = "@daily"
+    backup-target-db = "postgres"
+  }
   update {
     max_parallel = 1
     health_check = "checks"
@@ -13,7 +18,6 @@ job "nodered" {
     network {
       port "ui" {
         static = 1880
-        to = 9999
       }
     }
 
