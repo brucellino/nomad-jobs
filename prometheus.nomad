@@ -70,22 +70,20 @@ scrape_configs:
     authorization:
       credentials: '"${env["VAULT_TOKEN"]}"'
     static_configs:
-      - targets: ['192.168.1.16:8200']
+      - targets: ['vault.service.consul:8200']
   - job_name: 'instance_metrics'
     static_configs:
       - targets:
           {{ range nodes }}
           - {{ .Address}}:9100
           {{ end }}
-  - job_name: 'nomad_metrics'
+  - job_name: 'consul_metrics'
     consul_sd_configs:
-    - server: '{{ env "CONSUL_HTTP_ADDR" }}'
+    - server: sense:8500
       services:
-        - 'nomad-client'
-        - 'nomad'
-        - 'consul'
-        - 'minio-api'
-        - 'minio-console'
+        {{ range services }}
+        - {{ .Name }}
+        {{ end }}
     relabel_configs:
     - source_labels: ['__meta_consul_tags']
       regex: '(.*)http(.*)'
@@ -108,8 +106,8 @@ EOH
       }
 
       resources {
-        cpu = 1000
-        memory = 800
+        cpu = 250
+        memory = 400
       }
 
       service {
