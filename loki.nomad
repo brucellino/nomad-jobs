@@ -25,7 +25,7 @@ job "loki" {
   }
   priority = 80
   group "log-server" {
-    count = 2
+    count = 3
 
     network {
       port "loki_http_listen" {
@@ -64,8 +64,56 @@ job "loki" {
           "-config.file=local/loki.yml"
         ]
       }
+      resources {
+        cpu = 128
+        memory = 50
+      }
       template {
-        source = "local/loki.yml.tpl"
+        // source = "local/loki.yml.tpl"
+        data = <<EOT
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+ingester:
+  autoforget_unhealthy: true
+  lifecycler:
+    heartbeat_period: "15s"
+    min_ready_duration: "30s"
+ingester_client:
+  pool_config:
+    health_check_ingesters: true
+  remote_timeout: "5s"
+common:
+  replication_factor: 3
+  path_prefix: /tmp/loki
+  storage:
+    filesystem:
+#      directory: /tmp/loki
+      chunks_directory: /tmp/loki/chunks
+      rules_directory: /tmp/loki/rules
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: consul
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://localhost:9093
+
+analytics:
+  reporting_enabled: false
+        EOT
         destination = "local/loki.yml"
       }
       artifact {
