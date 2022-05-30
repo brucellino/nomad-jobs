@@ -8,16 +8,6 @@ variable "root_password" {
     type = string
 }
 
-variable "access_key" {
-    description = "Access key for the root user"
-    type = string
-}
-
-variable "secret_key" {
-    description = "Secret key for the root user"
-    type = string
-}
-
 variable "minio_storage_size"{
     description = "Size of the minio storage"
     type = number
@@ -100,6 +90,7 @@ job "minio" {
         command = "${NOMAD_ALLOC_DIR}/minio"
         args    = [
           "server",
+          "--address=${NOMAD_ADDR_api}",
           "--console-address=${NOMAD_ADDR_console}",
           "${NOMAD_ALLOC_DIR}/data"]
       }
@@ -111,9 +102,16 @@ job "minio" {
       env {
         MINIO_ROOT_USER     = var.root_username
         MINIO_ROOT_PASSWORD = var.root_password
+        MINIO_SERVER_URL    = "http://minio-api.service.consul:9000"
         MINIO_VOLUMES="http://${attr.unique.hostname}/${NOMAD_ALLOC_DIR}/data"
-        MINIO_ACCESS_KEY    = var.access_key
-        MINIO_SECRET_KEY    = var.secret_key
+        MINIO_NOTIFY_REDIS_ENABLE_PRIMARY = "on"
+        MINIO_NOTIFY_REDIS_REDIS_ADDRESS_PRIMARY = "http://redis-cache.service.consul:6379"
+        MINIO_NOTIFY_REDIS_KEY_PRIMARY="bucketevents"
+        MINIO_NOTIFY_REDIS_FORMAT_PRIMARY="namespace"
+        MINIO_NOTIFY_REDIS_ENABLE_SECONDARY="on"
+        MINIO_NOTIFY_REDIS_REDIS_ADDRESS_SECONDARY="https://redis-cache.service.consul:6379"
+        MINIO_NOTIFY_REDIS_KEY_SECONDARY="bucketevents"
+        MINIO_NOTIFY_REDIS_FORMAT_SECONDARY="namespace"
       }
 
       resources {
@@ -148,7 +146,7 @@ job "minio" {
       }
 
       service {
-        tags = ["minio", "s3", "console", "urlprefix-/minio-console"]
+        tags = ["minio", "s3", "console", "urlprefix-/minio-console redirect=9001,http://console.minio-console.service.consul"]
         port = "console"
         name = "minio-console"
         check {
