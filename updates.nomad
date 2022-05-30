@@ -15,7 +15,7 @@ job "upgrade" {
       }
       config {
         command = "/bin/bash"
-        args = ["-c", "apt-get update && apt-get upgrade -y"]
+        args = ["-c", "sudo apt-get update && sudo apt-get upgrade -y"]
       }
     }
   }
