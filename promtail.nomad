@@ -19,11 +19,11 @@ job "promtail" {
   }
   datacenters = ["dc1"]
   type = "system"
-  // constraint {
-  //   attribute = "${node.class}"
-  //   operator = "regexp"
-  //   value = "32|64"
-  // }
+  constraint {
+    attribute = "${node.class}"
+    operator = "regexp"
+    value = "64"
+  }
 
   group "promtail" {
     count = 1
@@ -78,10 +78,15 @@ job "promtail" {
         args = ["-config.file=local/promtail.yml"]
       }
 
+      // artifact {
+      //    source = "http://minio-api.service.consul:9000/loki-bin/promtail-linux-${attr.cpu.arch}.zip"
+      //    destination = "local/promtail"
+      //    mode = "file"
+      // }
       artifact {
-         source = "http://minio-api.service.consul:9000/loki-bin/promtail-linux-${attr.cpu.arch}.zip"
-         destination = "local/promtail"
-         mode = "file"
+        source = "https://github.com/grafana/loki/releases/download/v2.5.0/promtail-linux-arm64.zip"
+        destination = "local/promtail"
+        mode = "file"
       }
 
 

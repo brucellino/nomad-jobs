@@ -9,14 +9,14 @@ clients:
   - url: http://loki-http-server.service.consul:3100/loki/api/v1/push
 
 scrape_configs:
-- job_name: system
+- job_name: consul
   static_configs:
   - targets:
       - localhost
     labels:
       job: consul
-      __path__: /var/log/consul*.log
-- job_name: system
+      __path__: /home/consul/*.log
+- job_name: nomad
   static_configs:
   - targets:
       - localhost
