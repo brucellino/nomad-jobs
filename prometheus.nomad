@@ -92,6 +92,33 @@ scrape_configs:
     metrics_path: /v1/metrics
     params:
       format: ['prometheus']
+  - job_name: nomad_metrics
+    params:
+      format:
+      - prometheus
+    scrape_interval: 5s
+    scrape_timeout: 5s
+    metrics_path: /v1/metrics
+    scheme: http
+    consul_sd_configs:
+    - server: consul.service.consul:8500
+      services:
+        - nomad
+        - nomad-client
+      datacenter: dc1
+      tag_separator: ','
+    relabel_configs:
+    - source_labels: [__meta_consul_tags]
+      separator: ;
+      regex: (.*)http(.*)
+      replacement: $1
+      action: keep
+    - source_labels: [__meta_consul_address]
+      separator: ;
+      regex: (.*)
+      target_label: __meta_consul_service_address
+      replacement: $1
+      action: replace
 EOH
       }
 
