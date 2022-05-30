@@ -44,9 +44,10 @@ job "cache" {
     healthy_deadline = "5m"
   }
   group "cache" {
-    count = 3
+    count = 1
     network {
       port "db" {
+        static = 6379
         to = 6379
       }
     }
