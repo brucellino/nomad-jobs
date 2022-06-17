@@ -2,11 +2,13 @@ job "alertmanager" {
   datacenters = ["dc1"]
 
   type = "service"
+
   meta {
-    auto-backup = true
-    backup-schedule = "@daily"
+    auto-backup      = true
+    backup-schedule  = "@daily"
     backup-target-db = "postgres"
   }
+
   group "alerting" {
     count = 1
 
@@ -15,6 +17,7 @@ job "alertmanager" {
 
       port "alertmanager_ui" {
         static = 9093
+        to     = 9093
       }
     }
 
@@ -55,27 +58,21 @@ job "alertmanager" {
       }
 
       resources {
-        cpu    = 1200
-        memory = 512
+        cpu    = 125
+        memory = 256
       }
 
       service {
         name = "alertmanager"
-
         tags = ["urlprefix-/alertmanager strip=/alertmanager"]
-
         port = "alertmanager_ui"
 
         check {
-          name = "alertmanager_ui port alive"
-
-          type = "http"
-
-          path = "/-/healthy"
-
+          name     = "alertmanager_ui port alive"
+          type     = "http"
+          path     = "/-/healthy"
           interval = "10s"
-
-          timeout = "2s"
+          timeout  = "2s"
         }
       }
     }
