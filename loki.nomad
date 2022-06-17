@@ -14,7 +14,7 @@ job "loki" {
     backup-target-db = "postgres"
   }
   update {
-    max_parallel = 2
+    max_parallel = 1
     health_check = "checks"
     min_healthy_time = "5s"
     healthy_deadline = "60s"
@@ -25,7 +25,7 @@ job "loki" {
   }
   priority = 80
   group "log-server" {
-    count = 3
+    count = 1
 
     network {
       port "loki_http_listen" {
