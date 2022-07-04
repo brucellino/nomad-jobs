@@ -1,3 +1,8 @@
+variable "jenkins_plugins" {
+  type = list(string)
+  description = "List of plugin names for jenkins"
+}
+
 job "jenkins" {
   datacenters = ["dc1"]
   priority    = 100
@@ -6,7 +11,7 @@ job "jenkins" {
   constraint {
     attribute = "${attr.driver.java.version}"
     operator = ">="
-    value = "1.11"
+    value = "11"
 
   }
 
@@ -25,10 +30,20 @@ job "jenkins" {
 
   group "jenkins" {
     count = 1
+    volume "casc" {
+      type = "host"
+      read_only = false
+      source = "jenkins_casc"
+    }
 
+    volume "jenkins_home" {
+      type = "host"
+      read_only = false
+      source = "jenkins_config"
+    }
     network {
       port "server" {
-        static = 8080
+        to = 8080
       }
     }
 
@@ -39,14 +54,19 @@ job "jenkins" {
     }
 
     task "prepare-plugin-ref" {
+      template {
+        change_mode = "restart"
+        data = "yamlencode(var.jenkins_plugins)"
+        destination = "${NOMAD_ALLOC_DIR}/casc/plugins.txt"
+      }
       lifecycle {
         hook    = "prestart"
         sidecar = false
       }
 
       resources {
-        cores  = 1
-        memory = 1024
+        cpu = 200
+        memory = 128
       }
 
       artifact {
@@ -63,85 +83,31 @@ job "jenkins" {
         destination = "local/jenkins.war"
         mode        = "file"
       }
-      template {
-        change_mode = "restart"
-        data = <<EOH
-blueocean
-blueocean-commons
-blueocean-config
-blueocean-core-js
-blueocean-dashboard
-blueocean-display-url
-blueocean-events
-blueocean-git-pipeline
-blueocean-github-pipeline
-blueocean-i18n
-blueocean-jwt
-blueocean-personalization
-blueocean-pipeline-api-impl
-blueocean-pipeline-editor
-blueocean-pipeline-scm-api
-blueocean-rest
-blueocean-rest-impl
-blueocean-web
-branch-api
-configuration-as-code
-credentials
-credentials-binding
-dashboard-view
-display-url-api
-durable-task
-github
-github-api
-github-autostatus
-github-branch-source
-greenballs
-hashicorp-vault-pipeline
-hashicorp-vault-plugin
-job-dsl
-metrics
-monitoring
-pipeline-build-step
-pipeline-github
-pipeline-github-lib
-pipeline-githubnotify-step
-pipeline-graph-analysis
-pipeline-milestone-step
-pipeline-model-api
-pipeline-model-definition
-pipeline-model-extensions
-pipeline-rest-api
-pipeline-stage-step
-pipeline-stage-tags-metadata
-pipeline-stage-view
-pipeline-utility-steps
-trilead-api
-workflow-api
-workflow-basic-steps
-workflow-cps
-workflow-cps-global-lib
-workflow-durable-task-step
-workflow-job
-workflow-multibranch
-workflow-scm-step
-workflow-step-api
-workflow-support
-EOH
-        destination = "local/plugins.txt"
+
+
+      volume_mount {
+        volume = "casc"
+        destination = "${NOMAD_ALLOC_DIR}/casc"
+        read_only = false
       }
-      driver = "raw_exec"
+
+      volume_mount {
+        volume = "jenkins_home"
+        destination = "${NOMAD_ALLOC_DIR}/jenkins_home"
+        read_only = false
+      }
+
+      driver = "java"
 
       config {
-        command = "java"
-        args    = [
-          "-jar",
-          "local/jenkins-plugin-manager.jar",
+        jar_path = "local/jenkins-plugin-manager.jar"
+        args = [
           "--skip-failed-plugins",
           "--verbose",
           "--war", "local/jenkins.war",
-          "--plugin-file", "local/plugins.txt",
+          "--plugin-file", "${NOMAD_ALLOC_DIR}/casc/plugins.txt",
           "-d",
-          "local/plugins"
+          "${NOMAD_ALLOC_DIR}/jenkins_home/plugins/"
         ]
       }
     }
@@ -163,13 +129,13 @@ EOH
       }
       service {
         name = "jenkins-java-controller"
-        tags = ["jenkins", "ci"]
+        tags = ["jenkins", "ci", "urlprefix-/jenkins"]
         port = "server"
 
         check {
-          path     = "/login"
+          path     = "/"
           name     = "alive"
-          type     = "tcp"
+          type     = "http"
           interval = "60s"
           timeout  = "10s"
           port     = "server"
@@ -187,11 +153,7 @@ EOH
         max_file_size = 15
       }
 
-      // volume_mount {
-      //   volume      = "casc"
-      //   destination = "/jenkins_casc"
-      //   read_only   = true
-      // }
+
       template {
         data = <<EOH
 ---
@@ -215,12 +177,23 @@ jenkins:
           password: "1234"
 EOH
 
-        destination = "local/jenkins_casc/jenkins.yml"
+        destination = "${NOMAD_ALLOC_DIR}/casc/jenkins.yml"
       }
 
       env {
-        CASC_JENKINS_CONFIG = "local/jenkins_casc/jenkins.yml"
-        JENKINS_HOME        = "local"
+        CASC_JENKINS_CONFIG = "${NOMAD_ALLOC_DIR}/casc/jenkins.yml"
+        JENKINS_HOME        = "${NOMAD_ALLOC_DIR}/jenkins_home/"
+      }
+      volume_mount {
+        volume = "casc"
+        destination = "${NOMAD_ALLOC_DIR}/casc"
+        read_only = false
+      }
+
+      volume_mount {
+        volume = "jenkins_home"
+        destination = "${NOMAD_ALLOC_DIR}/jenkins_home"
+        read_only = false
       }
 
       // csi_plugin {
@@ -229,8 +202,8 @@ EOH
       //   mount_dir = "/csi"
       // }
       resources {
-        cores  = 3
-        memory = 2048 # 256MB
+        cores  = 2
+        memory = 1048 # 256MB
       }
 
       restart {
