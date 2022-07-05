@@ -15,6 +15,10 @@ variable "minio_storage_size"{
 }
 
 job "minio" {
+
+  // vault {
+  //   policies = ["default"]
+  // }
   meta {
     auto-backup = true
     backup-schedule = "@daily"
@@ -32,25 +36,31 @@ job "minio" {
     value     = "arm64"
   }
 
+  constraint {
+    attribute = "${attr.unique.hostname}"
+    operator = "regexp"
+    value = "^turing[1|2|3|4]"
+  }
+
   group "server" {
-    count = 1
+    count = 4
     update {
-      max_parallel = 1
+      max_parallel = 4
       health_check = "checks"
-      canary = 1
+      canary = 4
       auto_promote = true
       auto_revert = true
     }
     reschedule {
       attempts       = 1
-      interval       = "24h"
+      interval       = "10m"
       unlimited      = false
       delay          = "5s"
       delay_function = "constant"
     }
 
     migrate {
-      max_parallel = 1
+      max_parallel = 4
       health_check = "checks"
       min_healthy_time = "10s"
       healthy_deadline = "10s"
@@ -61,9 +71,7 @@ job "minio" {
       source=  "scratch"
       read_only = false
     }
-    restart {
 
-    }
     network {
       port "api" {
         static = 9000
@@ -82,17 +90,19 @@ job "minio" {
         source = "https://dl.min.io/server/minio/release/linux-${attr.cpu.arch}/minio"
         destination = "${NOMAD_ALLOC_DIR}/minio"
         mode = "file"
-        // options {
-        //   checksum = "sha256:665f6690b630a7f7f5326dd3cbbf0647bbbc14c4a6cadbe7dfc919a23d727d56"
-        // }
+        options {
+          checksum = "sha256:9030f852c47fc37d56e5ef13475c09aa1c4725e4ca5dffa9803809969c05214e"
+        }
       }
+
       config {
         command = "${NOMAD_ALLOC_DIR}/minio"
         args    = [
           "server",
-          "--address=${NOMAD_ADDR_api}",
-          "--console-address=${NOMAD_ADDR_console}",
-          "${NOMAD_ALLOC_DIR}/data"]
+          "http://turing{1...4}.node.consul/data/nomad"
+          // "--address=${NOMAD_ADDR_api}",
+          // "--console-address=${NOMAD_ADDR_console}"
+        ]
       }
       volume_mount {
         volume      = "buckets"
@@ -102,8 +112,9 @@ job "minio" {
       env {
         MINIO_ROOT_USER     = var.root_username
         MINIO_ROOT_PASSWORD = var.root_password
-        MINIO_SERVER_URL    = "http://minio-api.service.consul:9000"
-        MINIO_VOLUMES="http://${attr.unique.hostname}/${NOMAD_ALLOC_DIR}/data"
+        // MINIO_ROOT_PASSWORD =
+        MINIO_SERVER_URL    = "http://${NOMAD_ADDR_api}"
+        // MINIO_VOLUMES="http://${attr.unique.hostname}/${NOMAD_ALLOC_DIR}/data"
         MINIO_NOTIFY_REDIS_ENABLE_PRIMARY = "on"
         MINIO_NOTIFY_REDIS_REDIS_ADDRESS_PRIMARY = "http://redis-cache.service.consul:6379"
         MINIO_NOTIFY_REDIS_KEY_PRIMARY="bucketevents"
@@ -155,11 +166,6 @@ job "minio" {
           port     = "console"
           interval = "60s"
           timeout  = "5s"
-
-        //   check_restart {
-        //     limit = 2
-        //     grace = "10s"
-        //   }
         }
       }
     }
