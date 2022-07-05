@@ -31,7 +31,7 @@ job "jenkins" {
       source    = "jenkins_casc"
     }
 
-    task "test" {
+    task "plugins-install" {
       lifecycle {
         hook = "prestart"
         sidecar = false
@@ -111,7 +111,7 @@ EOF
         check {
           type = "http"
           port = "ui"
-          path = "/login"
+          path = "/prometheus/"
           interval = "10s"
           timeout = "5s"
         }
