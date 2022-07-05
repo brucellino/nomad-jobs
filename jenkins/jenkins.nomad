@@ -7,22 +7,22 @@ job "jenkins" {
     auto_promote = true
     canary = 1
   }
+
   constraint {
     attribute  = "${attr.unique.hostname}"
     operator = "regexp"
     value = "^turing.*"
   }
+
   datacenters = ["dc1"]
   type = "service"
-  group "controller" {
+  group "main" {
     count = 1
-
     network {
       port "ui" {
         static = "8080"
       }
       mode = "host"
-
     }
 
     volume "casc" {
@@ -31,11 +31,7 @@ job "jenkins" {
       source    = "jenkins_casc"
     }
 
-    task "plugins-install" {
-      lifecycle {
-        hook = "prestart"
-        sidecar = false
-      }
+    task "controller" {
       driver = "exec"
       volume_mount {
         volume      = "casc"
@@ -63,7 +59,7 @@ job "jenkins" {
         change_mode = "restart"
       }
       env {
-        CASC_JENKINS_CONFIG = "/usr/share/jenkins/ref/casc/jenkins.yml"
+        CASC_JENKINS_CONFIG = "alloc/data/jenkins.yml"
         JENKINS_HOME        = "/usr/share/jenkins"
         CACHE_DIR = "local/"
       }
@@ -72,78 +68,15 @@ job "jenkins" {
 #!/bin/bash
 pwd
 set -eou pipefail
-tree /usr/share/jenkins/
 mkdir -vp /usr/share/jenkins/plugins
-ls -lht local/plugins.txt
-ls -lht /usr/share/jenkins/plugins/
 java -jar alloc/data/jenkins-plugin-manager.jar \
      --war alloc/data/jenkins.war \
      --plugin-file local/plugins.txt \
      --skip-failed-plugins \
      --verbose \
      -d /usr/share/jenkins/plugins/
-EOF
-        destination = "local/script.sh"
-        perms = "0777"
-      }
+echo "plugins installed"
 
-      config {
-        command = "/bin/bash"
-        args = ["local/script.sh"]
-      }
-    }
-
-    task "controller" {
-
-      driver = "exec"
-      config {
-        command = "/bin/bash"
-        args = ["local/script.sh"]
-      }
-      volume_mount {
-        volume      = "casc"
-        destination = "/usr/share/jenkins"
-        read_only   = false
-      }
-      leader = true
-      service {
-        port = "ui"
-
-        check {
-          type = "http"
-          port = "ui"
-          path = "/prometheus/"
-          interval = "10s"
-          timeout = "5s"
-        }
-
-        tags = ["urlprefix-/jenkins"]
-      }
-      env {
-        CASC_JENKINS_CONFIG = "alloc/data/jenkins.yml"
-        JENKINS_HOME        = "/usr/share/jenkins"
-        CACHE_DIR = "local/"
-      }
-      template {
-        data = <<EOH
----
-jenkins:
-  numExecutors: 0
-  systemMessage: "This the best ever message"
-  securityRealm:
-    local:
-      allowsSignup: false
-      users:
-        - id: "admin"
-          password: "1234"
-EOH
-        destination = "alloc/data/jenkins.yml"
-      }
-      template {
-        data = <<EOF
-#!/bin/bash
-sleep 5
-ls -lht /usr/share/jenkins
 java \
   -Xmx1024m \
   -Xms256m \
@@ -158,6 +91,90 @@ java \
 EOF
         destination = "local/script.sh"
         perms = "0777"
+      }
+
+      config {
+        command = "/bin/bash"
+        args = ["local/script.sh"]
+      }
+
+      service {
+        port = "ui"
+
+        check {
+          type = "http"
+          port = "ui"
+          path = "/prometheus/"
+          interval = "10s"
+          timeout = "5s"
+        }
+
+        on_update = "require_healthy"
+
+        tags = ["urlprefix-/jenkins"]
+      }
+      template {
+        data = <<EOH
+---
+jenkins:
+  agentprotocols:
+    - "JNLP4-connect"
+    - "Ping"
+  numExecutors: 0
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:admin"
+  crumbIssuer:
+    strict:
+      checkSessionMatch: false
+  remotingSecurity:
+    enabled: true
+  systemMessage: "This the best ever message"
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "1234"
+  clouds:
+    - nomad:
+        clientPassword: ""
+        name: "nomad"
+        nomadUrl: "http://nomad.service.consul:4646"
+        prune: false
+        serverPassword: ""
+        tlsEnabled: false
+        workerTimeout: 1
+
+security:
+  apiToken:
+    creationOfLegacyTokenEnabled: false
+    tokenGenerationOnCreationEnabled: false
+    usageStatisticsEnabled: true
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: true
+  sSHD:
+    port: -1
+unclassified:
+  prometheusConfiguration:
+    appendParamLabel: true
+    appendStatusLabel: true
+    collectDiskUsage: true
+    collectingMetricsPeriodInSeconds: 60
+    countAbortedBuilds: true
+    countFailedBuilds: true
+    countNotBuiltBuilds: true
+    countSuccessfulBuilds: true
+    countUnstableBuilds: true
+    defaultNamespace: "default"
+    fetchTestResults: true
+    jobAttributeName: "jenkins_job"
+    path: "prometheus"
+    processingDisabledBuilds: false
+    useAuthenticatedEndpoint: false
+EOH
+        destination = "alloc/data/jenkins.yml"
       }
 
       resources {
