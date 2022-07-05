@@ -60,6 +60,7 @@ job "jenkins" {
       template {
         data = "{{ key \"jenkins/plugins\" }}"
         destination = "local/plugins.txt"
+        change_mode = "restart"
       }
       env {
         CASC_JENKINS_CONFIG = "/usr/share/jenkins/ref/casc/jenkins.yml"
