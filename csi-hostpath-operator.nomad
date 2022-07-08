@@ -1,12 +1,15 @@
 job "csi" {
   datacenters = ["dc1"]
-  type = "sysbatch"
+  type        = "sysbatch"
+
   group "hostpath" {
     task "install" {
       driver = "raw_exec"
-        config {
-          command = "local/script.sh"
-        }
+
+      config {
+        command = "local/script.sh"
+      }
+
       template {
         data = <<EOF
 #!/bin/bash
@@ -17,8 +20,9 @@ cd csi-driver-host-path
 sudo make
 sudo install bin/hostpathplugin /usr/local/bin/
         EOF
+
         destination = "local/script.sh"
-        perms = "0777"
+        perms       = "0777"
       }
     }
   }
