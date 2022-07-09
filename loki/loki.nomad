@@ -1,8 +1,29 @@
 variable "loki_version" {
   type = string
-  default = "v2.5.0"
+  default = "v2.6.0"
   description = "Loki release to deploy. See https://github.com/grafana/loki/releases/"
 }
+
+variable "access_key" {
+  type = string
+  description = "S3 compatible storage access key ID"
+}
+
+variable "secret_key" {
+  type = string
+  description = "S3 compatible storage secret key"
+}
+
+variable "logs_bucket" {
+  type = string
+  description = "name of  the bucket we will store loki logs in"
+}
+
+variable "s3_endpoint" {
+  type = string
+  description = "endpoint of the s3-compatible storage backend for the logs"
+}
+
 job "loki" {
   datacenters = ["dc1"]
   type = "service"
@@ -66,7 +87,7 @@ job "loki" {
       }
       resources {
         cpu = 128
-        memory = 50
+        memory = 200
       }
       template {
         // source = "local/loki.yml.tpl"
@@ -76,43 +97,35 @@ auth_enabled: false
 server:
   http_listen_port: 3100
   grpc_listen_port: 9096
-ingester:
-  autoforget_unhealthy: true
-  lifecycler:
-    heartbeat_period: "15s"
-    min_ready_duration: "30s"
-ingester_client:
-  pool_config:
-    health_check_ingesters: true
-  remote_timeout: "5s"
-common:
-  replication_factor: 3
-  path_prefix: /tmp/loki
-  storage:
-    filesystem:
-#      directory: /tmp/loki
-      chunks_directory: /tmp/loki/chunks
-      rules_directory: /tmp/loki/rules
-  ring:
-    instance_addr: 127.0.0.1
-    kvstore:
-      store: consul
-
+memberlist:
+  join_members:
+    - loki-http-server
 schema_config:
   configs:
-    - from: 2020-10-24
+    - from: 2022-01-01
       store: boltdb-shipper
-      object_store: filesystem
+      object_store: s3
       schema: v11
       index:
         prefix: index_
         period: 24h
-
+common:
+  path_prefix: local/
+  replication_factor: 1
+  storage:
+    s3:
+      endpoint: ${var.s3_endpoint}
+      bucketnames: ${var.logs_bucket}
+      access_key_id: ${var.access_key}
+      secret_access_key: ${var.secret_key}
+      s3forcepathstyle: true
+  ring:
+    kvstore:
+      store: consul
 ruler:
-  alertmanager_url: http://localhost:9093
-
-analytics:
-  reporting_enabled: false
+  storage:
+    s3:
+      bucketnames: hah-logs
         EOT
         destination = "local/loki.yml"
       }
@@ -123,17 +136,6 @@ analytics:
         destination = "local/loki"
         mode = "file"
       }
-      // artifact {
-      //   source = "http://minio-deploy-run.service.consul:9000/loki-bin/loki-linux-${attr.cpu.arch}.zip"
-      //   destination = "local/loki"
-      //   mode = "file"
-      // }
-      // artifact {
-      //   source = "http://minio-deploy-run.service.consul:9000/loki-config/loki.hcl.tpl"
-      //   destination = "local/loki.yml.tpl"
-      //   mode = "file"
-      // }
-
     }
 
   }
