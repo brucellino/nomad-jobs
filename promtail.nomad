@@ -12,6 +12,7 @@
 #     https://www.nomadproject.io/docs/job-specification/job
 #
 job "promtail" {
+
   meta {
     auto-backup = true
     backup-schedule = "@daily"
@@ -19,6 +20,7 @@ job "promtail" {
   }
   datacenters = ["dc1"]
   type = "system"
+
   constraint {
     attribute = "${node.class}"
     operator = "regexp"
@@ -49,19 +51,10 @@ job "promtail" {
     }
 
     restart {
-      # The number of attempts to run the job within the specified interval.
-      attempts = 2
-      interval = "30m"
-
-      # The "delay" parameter specifies the duration to wait before restarting
-      # a task after it has failed.
+      attempts = 3
+      interval = "10m"
       delay = "15s"
-
-      # The "mode" parameter controls what happens when a task has restarted
-      # "attempts" times within the interval. "delay" mode delays the next
-      # restart until the next interval. "fail" mode does not restart the task
-      # if "attempts" has been hit within the interval.
-      mode = "fail"
+      mode = "delay"
     }
 
     ephemeral_disk {

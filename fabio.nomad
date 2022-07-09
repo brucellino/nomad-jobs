@@ -16,6 +16,12 @@ job "fabio" {
         static = 9998
       }
     }
+    restart {
+      attempts = 3
+      interval = "10m"
+      delay = "15s"
+      mode = "delay"
+    }
 
     task "fabio" {
       artifact {
