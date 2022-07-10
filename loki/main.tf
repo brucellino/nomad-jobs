@@ -42,6 +42,9 @@ resource "digitalocean_spaces_bucket" "logs" {
   region = var.doregion
   name   = "hah-logs"
   acl    = "private"
+  versioning {
+    enabled = true
+  }
   lifecycle_rule {
     # id      = "monthly"
     enabled = true
