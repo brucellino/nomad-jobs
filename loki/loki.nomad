@@ -1,27 +1,14 @@
-variable "loki_version" {
-  type = string
-  default = "v2.6.0"
-  description = "Loki release to deploy. See https://github.com/grafana/loki/releases/"
-}
-
 variable "access_key" {
   type = string
-  description = "S3 compatible storage access key ID"
 }
 
 variable "secret_key" {
   type = string
-  description = "S3 compatible storage secret key"
 }
 
-variable "logs_bucket" {
+variable "loki_version" {
   type = string
-  description = "name of  the bucket we will store loki logs in"
-}
-
-variable "s3_endpoint" {
-  type = string
-  description = "endpoint of the s3-compatible storage backend for the logs"
+  default = "v2.6.0"
 }
 
 job "loki" {
@@ -38,8 +25,8 @@ job "loki" {
     max_parallel = 1
     health_check = "checks"
     min_healthy_time = "5s"
-    healthy_deadline = "60s"
-    progress_deadline = "3m"
+    healthy_deadline = "300s"
+    progress_deadline = "10m"
     auto_revert = true
     auto_promote = true
     canary = 1
@@ -49,36 +36,42 @@ job "loki" {
     count = 1
 
     network {
-      port "loki_http_listen" {
+      port "http" {
         static = 3100
       }
-      port "loki_grpc_listen" {
+      port "grpc" {
         static = 9096
       }
     }
     service {
       name = "loki-http-server"
       tags = ["logs", "loki", "observability", "urlprefix-/loki"]
-      port = "loki_http_listen"
+      port = "http"
+      on_update = "require_healthy"
 
       check {
-        name = "loki_http_alive"
-        type = "tcp"
+        name = "loki_alive"
+        type = "grpc"
+        port = "grpc"
         interval = "10s"
         timeout = "3s"
       }
 
       check {
-        name = "loki_http_ready"
+        name = "loki_ready"
         type = "http"
         path = "/ready"
-        port = "loki_http_listen"
+        port = "http"
         interval = "10s"
         timeout = "3s"
       }
     }
     task "server" {
-      driver = "raw_exec"
+      driver = "exec"
+      env {
+        access_key = var.access_key
+        secret_key = var.secret_key
+      }
       config {
         command = "loki"
         args = [
@@ -90,44 +83,9 @@ job "loki" {
         memory = 200
       }
       template {
-        // source = "local/loki.yml.tpl"
-        data = <<EOT
-auth_enabled: false
-
-server:
-  http_listen_port: 3100
-  grpc_listen_port: 9096
-memberlist:
-  join_members:
-    - loki-http-server
-schema_config:
-  configs:
-    - from: 2022-01-01
-      store: boltdb-shipper
-      object_store: s3
-      schema: v11
-      index:
-        prefix: index_
-        period: 24h
-common:
-  path_prefix: local/
-  replication_factor: 1
-  storage:
-    s3:
-      endpoint: ${var.s3_endpoint}
-      bucketnames: ${var.logs_bucket}
-      access_key_id: ${var.access_key}
-      secret_access_key: ${var.secret_key}
-      s3forcepathstyle: true
-  ring:
-    kvstore:
-      store: consul
-ruler:
-  storage:
-    s3:
-      bucketnames: hah-logs
-        EOT
+        data = file("loki.yml.tpl")
         destination = "local/loki.yml"
+        change_mode = "restart"
       }
       artifact {
         source = "https://github.com/grafana/loki/releases/download/${var.loki_version}/loki-linux-${attr.cpu.arch}.zip"
@@ -137,6 +95,5 @@ ruler:
         mode = "file"
       }
     }
-
   }
 }
