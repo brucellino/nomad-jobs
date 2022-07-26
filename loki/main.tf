@@ -70,7 +70,7 @@ resource "consul_keys" "bucket" {
 
   key {
     path  = "jobs/loki/logs_bucket"
-    value = "digitalocean_spaces_bucket.logs.name"
+    value = digitalocean_spaces_bucket.logs.name
   }
 }
 
