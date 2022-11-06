@@ -34,8 +34,11 @@ job "plugin-csi-hostpath-controller" {
         destination = "${NOMAD_ALLOC_DIR}/usr/local"
       }
       artifact {
-        source = "https://github.com/kubernetes-csi/csi-driver-host-path/archive/refs/tags/v${var.plugin_version}.tar.gz"
-        destination = "${NOMAD_ALLOC_DIR}/local/"
+        source = "git::https://github.com/kubernetes-csi/csi-driver-host-path"
+        destination = "${NOMAD_ALLOC_DIR}"
+        options {
+          ref = var.plugin_version
+        }
       }
       resources {
         cpu = 100
@@ -58,10 +61,13 @@ job "plugin-csi-hostpath-controller" {
         data = <<EOF
 #!/bin/bash
 set -eou pipefail
-cd ${NOMAD_ALLOC_DIR}/local/csi-driver-host-path-${PLUGIN_VERSION}
+cd ${NOMAD_ALLOC_DIR}/csi-driver-host-path
 make
-mkdir -p ${NOMAD_ALLOC_DIR}/bin
-PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NOMAD_ALLOC_DIR}/bin/
+ls -lht bin
+// mkdir -p ${NOMAD_ALLOC_DIR}/bin
+ls -lht /
+ls -lht /bin
+PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin bin/
         EOF
         destination = "local/script.sh"
         perms       = "0777"
