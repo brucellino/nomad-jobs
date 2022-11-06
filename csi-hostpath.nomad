@@ -29,16 +29,18 @@ job "plugin-csi-hostpath-controller" {
   }
   group "controller" {
     task "build" {
+      # Get the plugin source which we will build
       artifact {
-        source = "https://go.dev/dl/go${var.go_version}.linux-${attr.cpu.arch}.tar.gz"
-        destination = "${NOMAD_ALLOC_DIR}/usr/local"
-      }
-      artifact {
-        source = "git::https://github.com/kubernetes-csi/csi-driver-host-path"
-        destination = "${NOMAD_ALLOC_DIR}"
+        source = "git::https://github.com/kubernetes-csi/csi-driver-host-path.git"
+        destination = "${NOMAD_ALLOC_DIR}/plugin"
+        mode = "dir"
         options {
           ref = var.plugin_version
         }
+      }
+      artifact {
+        source = "https://go.dev/dl/go${var.go_version}.linux-${attr.cpu.arch}.tar.gz"
+        destination = "${NOMAD_ALLOC_DIR}/usr/local"
       }
       resources {
         cpu = 100
@@ -61,7 +63,7 @@ job "plugin-csi-hostpath-controller" {
         data = <<EOF
 #!/bin/bash
 set -eou pipefail
-cd ${NOMAD_ALLOC_DIR}/csi-driver-host-path
+cd ${NOMAD_ALLOC_DIR}/plugin/csi-driver-host-path
 make
 ls -lht bin
 // mkdir -p ${NOMAD_ALLOC_DIR}/bin
