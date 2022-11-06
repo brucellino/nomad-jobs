@@ -77,7 +77,7 @@ echo "I am $(whoami)"
 echo "I am in ${PWD}"
 cd local/plugin
 make
-ls -lht bin
+# go build -a -ldflags ' -X main.version=v${PLUGIN_VERSION} -extldflags "-static"' -o ${NOMAD_ALLOC_DIR}/bin/hostpathplugin .
 mkdir -p ${NOMAD_ALLOC_DIR}/bin
 PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NOMAD_ALLOC_DIR}/bin
         EOF
