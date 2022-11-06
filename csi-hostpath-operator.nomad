@@ -52,6 +52,7 @@ ls -lht ${NOMAD_ALLOC_DIR}/usr/local/go
 #!/bin/bash
 set -eou pipefail
 go version
+rm -rf csi-driver-host-path
 git clone https://github.com/kubernetes-csi/csi-driver-host-path.git
 cd csi-driver-host-path
 PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} make
