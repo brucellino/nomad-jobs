@@ -59,6 +59,8 @@ job "plugin-csi-hostpath-controller" {
 #!/bin/bash
 set -eou pipefail
 cd ${NOMAD_ALLOC_DIR}/local/csi-driver-host-path-${PLUGIN_VERSION}
+make
+mkdir -p ${NOMAD_ALLOC_DIR}/bin
 PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NOMAD_ALLOC_DIR}/bin/
         EOF
         destination = "local/script.sh"
