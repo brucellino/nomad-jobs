@@ -15,6 +15,7 @@ job "csi" {
       }
       env {
         ARCH = attr.cpu.arch
+        GO_VERSION = var.go_version
       }
       config {
         command = "local/script.sh"
@@ -26,7 +27,7 @@ set -eou pipefail
 mkdir -vp ${NOMAD_ALLOC_DIR}/usr/local
 echo "${ARCH}"
 #curl -fL https://go.dev/dl/go1.18.8.linux-arm64.tar.gz | tar xvz -C ${NOMAD_ALLOC_DIR}/usr/local
-curl -fL https://go.dev/dl/go${NOMAD_VAR_go_version} }}.linux-${ARCH}.tar.gz | tar xvz -C ${NOMAD_ALLOC_DIR}/usr/local
+curl -fL https://go.dev/dl/go${GO_VERSION}.linux-${ARCH}.tar.gz | tar xvz -C ${NOMAD_ALLOC_DIR}/usr/local
 ls -lht ${NOMAD_ALLOC_DIR}/usr/local/go
         EOF
         destination = "local/script.sh"
