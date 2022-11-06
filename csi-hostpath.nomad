@@ -16,6 +16,17 @@ variable "plugin_version" {
 job "plugin-csi-hostpath-controller" {
   datacenters = ["dc1"]
   type = "system"
+  update {
+    max_parallel      = 1
+    // health_check      = "checks"
+    // min_healthy_time  = "10s"
+    // healthy_deadline  = "5m"
+    // progress_deadline = "10m"
+    auto_revert       = true
+    auto_promote      = true
+    canary            = 1
+    // stagger           = "30s"
+  }
   group "controller" {
     task "build" {
       artifact {
@@ -24,7 +35,7 @@ job "plugin-csi-hostpath-controller" {
       }
       artifact {
         source = "https://github.com/kubernetes-csi/csi-driver-host-path/archive/refs/tags/v${var.plugin_version}.tar.gz"
-        destination = "local/"
+        destination = "${NOMAD_ALLOC_DIR}/local/"
       }
       resources {
         cpu = 100
@@ -60,9 +71,13 @@ PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NO
         cpu    = 10 # 10 MHz
         memory = 25 # 25MB
       }
+      // service {
+      //   tags = ["csi"]
+      //   port =
+      // }
       driver = "exec"
       config {
-        command = "${NOMAD_ALLOC_DIR}/hostpathplugin"
+        command = "${NOMAD_ALLOC_DIR}/bin/hostpathplugin"
         args = [
           "--drivername=csi-hostpath",
           "--v=5",
