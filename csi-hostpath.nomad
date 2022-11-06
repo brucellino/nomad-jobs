@@ -30,16 +30,16 @@ job "plugin-csi-hostpath-controller" {
 
   group "controller" {
     restart {
-    interval = "1m"
-    attempts = 1
-    delay    = "15s"
-    mode     = "fail"
-  }
+      interval = "1m"
+      attempts = 1
+      delay    = "15s"
+      mode     = "fail"
+    }
     task "build" {
       # Get the plugin source which we will build
       artifact {
         source = "git::https://github.com/kubernetes-csi/csi-driver-host-path"
-        destination = "plugin"
+        destination = "local/plugin"
         mode = "dir"
         options {
           ref = "v${var.plugin_version}"
@@ -54,7 +54,9 @@ job "plugin-csi-hostpath-controller" {
         cpu = 100
         memory = 100
       }
-      driver = "exec"
+      # Need to use raw_exec because the artifact is downloaded as root and we run as
+      # nobody. This means that we can't create the "plugin/bin" directory
+      driver = "raw_exec"
       lifecycle {
         hook = "prestart"
       }
@@ -70,17 +72,14 @@ job "plugin-csi-hostpath-controller" {
       template {
         data = <<EOF
 #!/bin/bash
-whoami
-ls -lht
-pwd
 set -eou pipefail
-cd plugin
+echo "I am $(whoami)"
+echo "I am in ${PWD}"
+cd local/plugin
 make
 ls -lht bin
-sudo mkdir -p ${NOMAD_ALLOC_DIR}/bin
-ls -lht /
-ls -lht /bin
-PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NOMAD_ALLOC_DIR}/bin/
+mkdir -p ${NOMAD_ALLOC_DIR}/bin
+PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NOMAD_ALLOC_DIR}/bin
         EOF
         destination = "local/script.sh"
         perms       = "0777"
@@ -96,7 +95,7 @@ PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NO
       //   tags = ["csi"]
       //   port =
       // }
-      driver = "exec"
+      driver = "raw_exec"
       config {
         command = "${NOMAD_ALLOC_DIR}/bin/hostpathplugin"
         args = [
