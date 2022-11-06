@@ -17,14 +17,14 @@ job "plugin-csi-hostpath-controller" {
   datacenters = ["dc1"]
   type = "system"
   group "controller" {
-    task "go19" {
+    task "build" {
       artifact {
         source = "https://go.dev/dl/go${var.go_version}.linux-${attr.cpu.arch}.tar.gz"
         destination = "${NOMAD_ALLOC_DIR}/usr/local"
       }
       artifact {
         source = "https://github.com/kubernetes-csi/csi-driver-host-path/archive/refs/tags/v${var.plugin_version}.tar.gz"
-        destination = "local/csi-driver-host-path"
+        destination = "local/"
       }
       resources {
         cpu = 100
@@ -37,6 +37,7 @@ job "plugin-csi-hostpath-controller" {
       env {
         ARCH = attr.cpu.arch
         GO_VERSION = var.go_version
+        PLUGIN_VERSION = var.plugin_version
         PATH = "${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH}"
       }
       config {
@@ -46,10 +47,8 @@ job "plugin-csi-hostpath-controller" {
         data = <<EOF
 #!/bin/bash
 set -eou pipefail
-ls -lht ${NOMAD_ALLOC_DIR}/usr/local
-cd ${NOMAD_ALLOC_DIR}/local/csi-driver-host-path
-sudo PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin /usr/local/bin/
-which hostpathplugin
+cd ${NOMAD_ALLOC_DIR}/local/csi-driver-host-path-${PLUGIN_VERSION}
+PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NOMAD_ALLOC_DIR}/bin/
         EOF
         destination = "local/script.sh"
         perms       = "0777"
@@ -61,9 +60,9 @@ which hostpathplugin
         cpu    = 10 # 10 MHz
         memory = 25 # 25MB
       }
-      driver = "raw_exec"
+      driver = "exec"
       config {
-        command = "hostpathplugin"
+        command = "${NOMAD_ALLOC_DIR}/hostpathplugin"
         args = [
           "--drivername=csi-hostpath",
           "--v=5",
