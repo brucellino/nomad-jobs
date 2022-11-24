@@ -20,7 +20,7 @@ job "prometheus" {
   }
 
   group "monitoring" {
-    count = 2
+    count = 1
 
     network {
       port "prometheus_ui" {
@@ -41,11 +41,11 @@ job "prometheus" {
 
     task "prometheus" {
       artifact {
-        source      = "https://github.com/prometheus/prometheus/releases/download/v2.36.2/prometheus-2.36.2.linux-arm64.tar.gz"
+        source      = "https://github.com/prometheus/prometheus/releases/download/v2.40.2/prometheus-2.40.2.linux-arm64.tar.gz"
         destination = "local"
 
         options {
-          checksum = "sha256:302abfe197f40572b42c7b765f1a37beb7272f985165e5769519fe0a789dcc98"
+          checksum = "sha256:9f39cf29756106ee4c43fe31d346dcfca58fc275c751dce9f6b50eb3ee31356c"
         }
       }
       template {
@@ -56,7 +56,8 @@ job "prometheus" {
 global:
   scrape_interval:     20s
   evaluation_interval: 60s
-
+rule_files:
+  - 'node-rules.yml'
 scrape_configs:
   - job_name: 'instance_metrics'
     static_configs:
@@ -87,13 +88,85 @@ scrape_configs:
     metrics_path: /v1/metrics
     params:
       format: ['prometheus']
+  - job_name: 'nomad_metrics'
+    nomad_sd_configs:
+      - server: nomad.service.consul:4646
 EOH
       }
 
+      template {
+        change_mode = "restart"
+        destination = "local/node-rules.yml"
+        left_delimiter = "[["
+        right_delimiter = "]]"
+        data = <<EOH
+---
+groups:
+  - name: node.rules
+    rules:
+      - alert: InstanceDown
+        expr: up{job="instance_metrics"} == 0
+        for: 10m
+      - alert: InstancesDown
+        expr: avg(up{job="instance_metrics"}) BY (job)
+      - alert: HostMemoryUnderMemoryPressure
+        expr: rate(node_vmstat_pgmajfault[1m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host memory under memory pressure (instance {{ $labels.instance }})
+          description: "The node is under heavy memory pressure. High rate of major page faults\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: HostUnusualNetworkThroughputIn
+        expr: sum by (instance) (rate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 100
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: Host unusual network throughput in (instance {{ $labels.instance }})
+          description: "Host network interfaces are probably receiving too much data (> 100 MB/s)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+  - name: prom.rules
+    rules:
+      - alert: PrometheusJobMissing
+        expr: absent(up{job="prometheus"})
+        for: 0m
+        labels:
+          severity: warning
+        annotations:
+          summary: Prometheus job missing (instance {{ $labels.instance }})
+          description: "A Prometheus job has disappeared\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Prometheus target missing (instance {{ $labels.instance }})
+          description: "A Prometheus target has disappeared. An exporter might be crashed.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+  - name: consul.rules
+    rules:
+      - alert: ConsulServiceHealthcheckFailed
+        expr: consul_catalog_service_node_healthy == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Consul service healthcheck failed (instance {{ $labels.instance }})
+          description: "Service: `{{ $labels.service_name }}` Healthcheck: `{{ $labels.service_id }}`\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+      - alert: ConsulAgentUnhealthy
+        expr: consul_health_node_status{status="critical"} == 1
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Consul agent unhealthy (instance {{ $labels.instance }})
+          description: "A Consul agent is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+EOH
+      }
       driver = "exec"
 
       config {
-        command = "local/prometheus-2.36.2.linux-arm64/prometheus"
+        command = "local/prometheus-2.40.2.linux-arm64/prometheus"
         args    = [
           "--config.file=local/prometheus.yml",
           "--web.external-url=http://0.0.0.0:9090/prometheus"
