@@ -48,10 +48,24 @@ job "promtail" {
         timeout  = "2s"
       }
 
+      check {
+        name = "Promtail HTTP"
+        type = "http"
+        path = "/targets"
+        interval = "10s"
+        timeout = "5s"
+
+        check_restart {
+          limit = 2
+          grace = "60s"
+          ignore_warnings = false
+        }
+      }
+
     }
 
     restart {
-      attempts = 3
+      attempts = 2
       interval = "10m"
       delay = "15s"
       mode = "delay"
