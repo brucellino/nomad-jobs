@@ -59,6 +59,11 @@ job "loki" {
       }
     }
 
+    service {
+      name = "loki-grpc"
+      port = "grpc"
+    }
+
     task "server" {
       driver = "exec"
       env {
@@ -76,7 +81,7 @@ job "loki" {
         memory = 200
       }
       template {
-        data = file("loki-local.yml.tpl")
+        data = file("loki.yml.tpl")
         destination = "local/loki.yml"
         change_mode = "restart"
       }
