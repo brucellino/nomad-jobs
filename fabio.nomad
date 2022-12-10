@@ -1,3 +1,8 @@
+variable "fabio_version" {
+  type = string
+  default = "1.6.3"
+  description = "Version of Fabio to use"
+}
 job "fabio" {
   datacenters = ["dc1"]
   type = "system"
@@ -17,15 +22,15 @@ job "fabio" {
       }
     }
     restart {
-      attempts = 3
-      interval = "10m"
+      attempts = 1
+      interval = "2m"
       delay = "15s"
       mode = "delay"
     }
 
     task "fabio" {
       artifact {
-        source      = "https://github.com/fabiolb/fabio/releases/download/v1.6.0/fabio-1.6.0-linux_${attr.cpu.arch}"
+        source      = "https://github.com/fabiolb/fabio/releases/download/v${var.fabio_version}/fabio-${var.fabio_version}-linux_${attr.cpu.arch}"
         destination = "local/fabio"
         mode = "file"
       }
