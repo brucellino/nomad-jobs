@@ -38,13 +38,9 @@ provider "digitalocean" {
   spaces_secret_key = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["spaces_secret"]
 }
 
-provider "nomad" {
+provider "nomad" {}
 
-}
-
-provider "consul" {
-
-}
+provider "consul" {}
 
 resource "digitalocean_spaces_bucket" "logs" {
   region = var.doregion
@@ -94,6 +90,7 @@ resource "nomad_job" "loki" {
       "secret_key" = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["spaces_secret"]
     }
   }
-  purge_on_destroy = true
-  detach           = false
+  purge_on_destroy      = true
+  detach                = true
+  deregister_on_destroy = true
 }
