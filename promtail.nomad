@@ -1,16 +1,9 @@
-# There can only be a single job definition per file. This job is named
-# "example" so it will create a job with the ID and Name "example".
+variable "promtail_version" {
+  description = "Version of Promtail to deploy"
+  type = string
+  default = "v2.5.0"
+}
 
-# The "job" stanza is the top-most configuration option in the job
-# specification. A job is a declarative specification of tasks that Nomad
-# should run. Jobs have a globally unique name, one or many task groups, which
-# are themselves collections of one or many tasks.
-#
-# For more information and examples on the "job" stanza, please see
-# the online documentation at:
-#
-#     https://www.nomadproject.io/docs/job-specification/job
-#
 job "promtail" {
 
   meta {
@@ -32,13 +25,17 @@ job "promtail" {
 
     network {
       port "http" {
-        static = 9080
+        to = 9080
+      }
+
+      port "grpc" {
+        to = 9050
       }
     }
 
     service {
-      name = "promtail"
-      tags = ["logs", "promtail", "observability"]
+      name = "http"
+      tags = ["logs", "promtail", "observability", "http"]
       port = "http"
 
       check {
@@ -61,7 +58,22 @@ job "promtail" {
           ignore_warnings = false
         }
       }
+    }
 
+    service {
+      name = "grpc"
+      tags = ["logs", "promtail", "observability", "grpc"]
+      port = "grpc"
+
+      check {
+        name = "promtail-grpc"
+        grpc_service = ""
+        type = "grpc"
+        interval = "15s"
+        timeout = "5s"
+        grpc_use_tls = false
+        tls_skip_verify = true
+      }
     }
 
     restart {
@@ -85,13 +97,8 @@ job "promtail" {
         args = ["-config.file=local/promtail.yml"]
       }
 
-      // artifact {
-      //    source = "http://minio-api.service.consul:9000/loki-bin/promtail-linux-${attr.cpu.arch}.zip"
-      //    destination = "local/promtail"
-      //    mode = "file"
-      // }
       artifact {
-        source = "https://github.com/grafana/loki/releases/download/v2.5.0/promtail-linux-arm64.zip"
+        source = "https://github.com/grafana/loki/releases/download/v2.5.0/promtail-linux-${attr.cpu.arch}.zip"
         destination = "local/promtail"
         mode = "file"
       }
