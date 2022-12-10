@@ -1,9 +1,10 @@
 server:
+  log_level: info
   http_listen_port: 9080
-  grpc_listen_port: 0
+  grpc_listen_port: 9095
 
 positions:
-  filename: /tmp/positions.yaml
+  filename: /data/positions.yaml
 
 clients:
   - url: http://loki-http-server.service.consul:3100/loki/api/v1/push
@@ -23,3 +24,11 @@ scrape_configs:
     labels:
       job: nomad
       __path__: /var/log/nomad*.log
+- job_name: journal
+  journal:
+    max_age: 12h
+    labels:
+      job: systemd-journal
+    relabel_configs:
+      - source_labsl: ['__journal__systemd_unit']
+        target_label: 'unit'

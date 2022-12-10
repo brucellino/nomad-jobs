@@ -20,7 +20,7 @@ job "prometheus" {
   }
 
   group "monitoring" {
-    count = 1
+    count = 2
 
     network {
       port "prometheus_ui" {
@@ -90,7 +90,7 @@ scrape_configs:
       format: ['prometheus']
   - job_name: 'nomad_metrics'
     nomad_sd_configs:
-      - server: nomad.service.consul:4646
+      - server: http://nomad.service.consul:4646
 EOH
       }
 

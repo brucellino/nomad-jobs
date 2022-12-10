@@ -8,21 +8,21 @@ variable "secret_key" {
 
 variable "loki_version" {
   type = string
-  default = "v2.6.0"
+  default = "v2.7.1"
 }
 
 job "loki" {
   datacenters = ["dc1"]
   type = "service"
   name = "loki"
-  // migrate {}
+
   meta {
     auto-backup = true
     backup-schedule = "@hourly"
     backup-target-db = "postgres"
   }
   update {
-    max_parallel = 1
+    max_parallel = 2
     health_check = "checks"
     min_healthy_time = "5s"
     healthy_deadline = "300s"
@@ -45,17 +45,9 @@ job "loki" {
     }
     service {
       name = "loki-http-server"
-      tags = ["logs", "loki", "observability", "urlprefix-/loki"]
+      tags = ["urlprefix-/loki strip=/loki"]
       port = "http"
       on_update = "require_healthy"
-
-      check {
-        name = "loki_alive"
-        type = "grpc"
-        port = "grpc"
-        interval = "10s"
-        timeout = "3s"
-      }
 
       check {
         name = "loki_ready"
@@ -66,6 +58,12 @@ job "loki" {
         timeout = "3s"
       }
     }
+
+    service {
+      name = "loki-grpc"
+      port = "grpc"
+    }
+
     task "server" {
       driver = "exec"
       env {

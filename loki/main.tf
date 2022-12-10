@@ -38,13 +38,9 @@ provider "digitalocean" {
   spaces_secret_key = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["spaces_secret"]
 }
 
-provider "nomad" {
+provider "nomad" {}
 
-}
-
-provider "consul" {
-
-}
+provider "consul" {}
 
 resource "digitalocean_spaces_bucket" "logs" {
   region = var.doregion
@@ -79,7 +75,7 @@ resource "consul_keys" "endpoint" {
 
   key {
     path  = "jobs/loki/s3_endpoint"
-    value = "https://${digitalocean_spaces_bucket.logs.region}.digitaloceanspaces.com"
+    value = "${digitalocean_spaces_bucket.logs.region}.digitaloceanspaces.com"
   }
 }
 
@@ -90,10 +86,11 @@ resource "nomad_job" "loki" {
     enabled  = true
     allow_fs = true
     vars = {
-      "access_key" = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["spaces_key"]
-      "secret_key" = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["spaces_secret"]
+      "access_key" = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["loki_spaces_key"]
+      "secret_key" = jsondecode(data.vault_kv_secret_v2.digitalocean.data_json)["loki_spaces_secret"]
     }
   }
-  purge_on_destroy = true
-  detach           = false
+  purge_on_destroy      = false
+  detach                = true
+  deregister_on_destroy = false
 }
