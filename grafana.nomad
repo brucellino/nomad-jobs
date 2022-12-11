@@ -4,6 +4,12 @@ variable "grafana_version" {
   description = "Grafana version"
 }
 
+variable "grafana_admin_password" {
+  type = string
+  sensitive = true
+  description = "Password for the grafana admin interface"
+}
+
 // locals {
 //   grafana_arm = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-armv6.tar.gz"
 //   grafana_64 = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-arm64.tar.gz"
@@ -31,8 +37,8 @@ job "dashboard" {
   update {
     max_parallel      = 1
     min_healthy_time  = "20s"
-    healthy_deadline  = "20m"
-    progress_deadline = "30m"
+    healthy_deadline  = "5m"
+    progress_deadline = "10m"
     auto_revert       = true
     auto_promote      = true
     canary            = 1
@@ -55,7 +61,7 @@ job "dashboard" {
     }
     service {
       name = "mysql"
-      tags = ["db", "dashboard"]
+      tags = ["db", "dashboard", "urlprefix-/mysql:3306 proto=tcp"]
       port = "mysql_server"
 
       check {
@@ -95,7 +101,7 @@ job "dashboard" {
 
 
   group "grafana" {
-    count = 1
+    count = 2
     network {
       port "grafana_server" {
         to = 3000
@@ -105,7 +111,7 @@ job "dashboard" {
 
     service {
       name = "grafana"
-      tags = ["monitoring", "dashboard"]
+      tags = ["monitoring", "dashboard", "urlprefix-/grafana:3000"]
       port = "grafana_server"
 
       check {
@@ -126,8 +132,20 @@ job "dashboard" {
     }
 
     ephemeral_disk {
-      size = 300
+      size = 200
     }
+
+    task "wait-for-db" {
+      lifecycle {
+        hook = "prestart"
+      }
+      driver = "exec"
+      config {
+        command = "sh"
+        args = ["-c", "while ! nc -z mysql.service.consul 3306 ; do sleep 1 ; done"]
+      }
+    }
+
     task "grafana" {
       driver = "exec"
       logs {
@@ -156,11 +174,13 @@ job "dashboard" {
         data = <<EOT
 [auth.anonymous]
 enabled = true
+
 [server]
 protocol = http
 http_port = ${NOMAD_HOST_PORT_grafana_server}
 # cert_file = none
 # cert_key = none
+
 [database]
 type = mysql
 host = mysql.service.consul:3306
@@ -176,20 +196,27 @@ ssl_mode = disable
 data = ${NOMAD_ALLOC_DIR}/data/
 logs = ${NOMAD_ALLOC_DIR}/log/
 plugins = ${NOMAD_ALLOC_DIR}/plugins
+
 [analytics]
 reporting_enabled = false
+
 [snapshots]
 external_enabled = false
+
 [security]
 admin_user = admin
-admin_password = "admin"
+admin_password = ${var.grafana_admin_password}
 disable_gravatar = true
 [dashboards]
 versions_to_keep = 10
+
 [alerting]
 enabled = true
+
 [unified_alerting]
 enabled = false
+
+
 EOT
 
         destination = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
