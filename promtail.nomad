@@ -14,24 +14,25 @@ job "promtail" {
   datacenters = ["dc1"]
   type = "system"
 
-  // constraint {
-  //   attribute = "${attr.cpu.arch}"
-  //   operator = "="
-  //   value = "arm64"
-  // }
-
   group "promtail" {
     count = 1
-
+    update {
+      max_parallel = 3
+      canary = 0
+      stagger = "30s"
+    }
     network {
       port "http" {
         static = 9080
+      }
+      port "grpc" {
+        static = 9095
       }
     }
 
     service {
       name = "promtail"
-      tags = ["logs", "promtail", "observability"]
+      tags = ["http"]
       port = "http"
 
       check {
@@ -57,19 +58,21 @@ job "promtail" {
     }
 
     // service {
-    //   name = "grpc"
-    //   tags = ["logs", "promtail", "observability", "grpc"]
+    //   name = "promtail-grpc"
+    //   tags = ["grpc"]
     //   port = "grpc"
 
     //   check {
     //     name = "promtail-grpc"
-    //     grpc_service = ""
+    //     grpc_service = "promtail-grpc"
     //     type = "grpc"
     //     interval = "15s"
     //     timeout = "5s"
+    //     port = "grpc"
     //     grpc_use_tls = false
     //     tls_skip_verify = true
     //   }
+
     // }
 
     restart {
@@ -93,11 +96,6 @@ job "promtail" {
         args = ["-config.file=local/promtail.yml"]
       }
 
-      // artifact {
-      //    source = "http://minio-api.service.consul:9000/loki-bin/promtail-linux-${attr.cpu.arch}.zip"
-      //    destination = "local/promtail"
-      //    mode = "file"
-      // }
       artifact {
         source = "https://github.com/grafana/loki/releases/download/v2.7.3/promtail-linux-${attr.cpu.arch}.zip"
         destination = "local/promtail"
