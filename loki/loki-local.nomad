@@ -37,10 +37,10 @@ job "loki" {
 
     network {
       port "http" {
-        to = 3100
+        static = 3100
       }
       port "grpc" {
-        to = 9096
+        static = 9096
       }
     }
     service {
@@ -90,10 +90,16 @@ job "loki" {
 auth_enabled: false
 
 server:
-  http_listen_port: {{ env "NOMAD_PORT_http" }}
-  grpc_listen_port: {{ env "NOMAD_PORT_grpc" }}
+  http_listen_port: {{ env "NOMAD_HOST_PORT_http" }}
+  grpc_listen_port: {{ env "NOMAD_HOST_PORT_grpc" }}
   register_instrumentation: true
-
+distributor:
+  ring:
+    kvstore:
+      store: consul
+      prefix: loki/collectors
+      consul:
+        host: http://localhost:8500
 ingester:
   lifecycler:
     address: 127.0.0.1
