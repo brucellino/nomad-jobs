@@ -1,7 +1,7 @@
 variable "promtail_version" {
   description = "Version of Promtail to deploy"
   type = string
-  default = "v2.5.0"
+  default = "v2.7.3"
 }
 
 job "promtail" {
@@ -14,11 +14,11 @@ job "promtail" {
   datacenters = ["dc1"]
   type = "system"
 
-  constraint {
-    attribute = "${node.class}"
-    operator = "regexp"
-    value = "64"
-  }
+  // constraint {
+  //   attribute = "${attr.cpu.arch}"
+  //   operator = "="
+  //   value = "arm64"
+  // }
 
   group "promtail" {
     count = 1
@@ -37,8 +37,8 @@ job "promtail" {
       check {
         name     = "promtail-alive"
         type     = "tcp"
-        interval = "10s"
-        timeout  = "2s"
+        interval = "20s"
+        timeout  = "15s"
       }
 
       check {
@@ -56,24 +56,24 @@ job "promtail" {
       }
     }
 
-    service {
-      name = "grpc"
-      tags = ["logs", "promtail", "observability", "grpc"]
-      port = "grpc"
+    // service {
+    //   name = "grpc"
+    //   tags = ["logs", "promtail", "observability", "grpc"]
+    //   port = "grpc"
 
-      check {
-        name = "promtail-grpc"
-        grpc_service = ""
-        type = "grpc"
-        interval = "15s"
-        timeout = "5s"
-        grpc_use_tls = false
-        tls_skip_verify = true
-      }
-    }
+    //   check {
+    //     name = "promtail-grpc"
+    //     grpc_service = ""
+    //     type = "grpc"
+    //     interval = "15s"
+    //     timeout = "5s"
+    //     grpc_use_tls = false
+    //     tls_skip_verify = true
+    //   }
+    // }
 
     restart {
-      attempts = 3
+      attempts = 1
       interval = "10m"
       delay = "15s"
       mode = "delay"
@@ -99,7 +99,7 @@ job "promtail" {
       //    mode = "file"
       // }
       artifact {
-        source = "https://github.com/grafana/loki/releases/download/v2.5.0/promtail-linux-${attr.cpu.arch}.zip"
+        source = "https://github.com/grafana/loki/releases/download/v2.7.3/promtail-linux-${attr.cpu.arch}.zip"
         destination = "local/promtail"
         mode = "file"
       }
