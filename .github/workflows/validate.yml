@@ -4,16 +4,18 @@ on:
     branches:
      - main
 jobs:
-  validate:
+  vault-token:
     runs-on: ubuntu-22.04
     steps:
       - name: Get Vault
         run: |
           mkdir bin ; curl -fSL https://releases.hashicorp.com/vault/1.12.3/vault_1.12.3_linux_amd64.zip | gunzip -> bin/vault
       - name: Get token
-        run: bin/vault -version
-
-
+        run: chmod u+x bin/vault ; bin/vault -version
+  tailscale:
+    runs-on: ubuntu-22.04
+    needs: vault-token
+    steps:
       - name: Setup Tailscale
         uses: tailscale/github-action@main
         with:
