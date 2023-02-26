@@ -1,0 +1,13 @@
+name: Nomad Validate
+on:
+  pull_request:
+    branches:
+     - main
+jobs:
+  validate:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Setup Tailscale
+        uses: tailscale/github-action@main
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
