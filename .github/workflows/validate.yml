@@ -22,12 +22,12 @@ jobs:
     steps:
       - name: Get Vault
         run: |
-          mkdir bin ; curl -fSL https://releases.hashicorp.com/vault/1.12.3/vault_1.12.3_linux_amd64.zip | gunzip -> bin/vault
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/vault/1.12.3/vault_1.12.3_linux_amd64.zip | gunzip -> bin/vault
       - name: Get token
         run: chmod u+x bin/vault ; bin/vault -version
       - name: Get Nomad
         run: |
-          mkdir bin ; curl -fSL https://releases.hashicorp.com/nomad/1.4.4/nomad_1.4.4_linux_amd64.zip | gunzip -> bin/nomad
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.4.4/nomad_1.4.4_linux_amd64.zip | gunzip -> bin/nomad
       - name: Checkout change
         uses: actions/checkout@v3
         with:
