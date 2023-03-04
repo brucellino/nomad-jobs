@@ -8,6 +8,8 @@ on:
 
 jobs:
   tailscale:
+    env:
+      NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
     runs-on: ubuntu-22.04
     steps:
       - name: Setup Tailscale
@@ -29,8 +31,7 @@ jobs:
       - name: Checkout change
         uses: actions/checkout@v3
         with:
-          fetch-depth: 2
-      - name: Get changes
+          fetch-depth: 0
 
       - name: Plan the job
-        run: chmod u+x bin/nomad ; bin/nomad -version
+        run: chmod u+x bin/nomad ; bin/nomad plan ansible.nomad
