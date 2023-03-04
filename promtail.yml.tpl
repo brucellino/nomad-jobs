@@ -32,7 +32,7 @@ scrape_configs:
     labels:
       job: systemd-journal
   relabel_configs:
-  - source_labels: ['__journal__systemd_uinit']
+  - source_labels: ['__journal__systemd_unit']
     target_label: 'unit'
   - source_labels: ['__journal_syslog_identifier']
     target_label: 'syslog_identifier'
