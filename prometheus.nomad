@@ -67,7 +67,7 @@ scrape_configs:
           {{ end }}
   - job_name: 'consul_metrics'
     consul_sd_configs:
-      - server: consul.service.consul:8500
+      - server: localhost:8500
         services:
           {{ range services }}
           - {{ .Name }}
