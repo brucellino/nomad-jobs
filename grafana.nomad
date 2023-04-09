@@ -1,6 +1,6 @@
 variable "grafana_version" {
   type = string
-  default = "8.5.0"
+  default = "9.4.7"
   description = "Grafana version"
 }
 
@@ -31,7 +31,7 @@ job "dashboard" {
   # select machines with more than 4GB of RAM
   constraint {
     attribute = "${attr.memory.totalbytes}"
-    value     = "1GB"
+    value     = "500MB"
     operator  = ">="
   }
   update {
@@ -68,8 +68,8 @@ job "dashboard" {
         type = "tcp"
         port = "mysql_server"
         name = "mysql_alive"
-        interval = "20s"
-        timeout = "2s"
+        interval = "30s"
+        timeout = "5s"
       }
     }
 
@@ -119,8 +119,8 @@ job "dashboard" {
         name     = "grafana-api"
         path     = "/api/health"
         type     = "http"
-        interval = "20s"
-        timeout  = "5s"
+        interval = "10m"
+        timeout  = "10s"
       }
     }
 
@@ -159,7 +159,7 @@ job "dashboard" {
       }
       resources {
         cpu    = 1000
-        memory = 1024
+        memory = 512
       }
 
       config {
