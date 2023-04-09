@@ -83,7 +83,7 @@ EOF
       }
 
       vault {
-        policies      = ["nomad-cluster"]
+        policies      = ["nomad-read"]
         change_mode   = "signal"
         change_signal = "SIGHUP"
       }
