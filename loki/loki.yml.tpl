@@ -13,7 +13,7 @@ distributor:
       prefix: loki/collectors
 ingester:
   lifecycler:
-    address: loki-grpc.service.consul
+#    {{/* address: loki-grpc.service.consul */}}
     ring:
       kvstore:
         store: consul

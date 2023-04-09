@@ -97,7 +97,7 @@ distributor:
   ring:
     kvstore:
       store: consul
-      prefix: loki/collectors
+      prefix: loki/collectors/
       consul:
         host: http://localhost:8500
 ingester:
