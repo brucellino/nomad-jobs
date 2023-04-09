@@ -1,0 +1,37 @@
+name: Nomad Validate
+on:
+  pull_request:
+    branches:
+     - main
+    paths:
+      - '**.nomad'
+
+jobs:
+  tailscale:
+    env:
+      NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Setup Tailscale
+        uses: tailscale/github-action@main
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+  nomad-plan:
+    needs: tailscale
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Get Vault
+        run: |
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/vault/1.12.3/vault_1.12.3_linux_amd64.zip | gunzip -> bin/vault
+      - name: Get token
+        run: chmod u+x bin/vault ; bin/vault -version
+      - name: Get Nomad
+        run: |
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.4.4/nomad_1.4.4_linux_amd64.zip | gunzip -> bin/nomad
+      - name: Checkout change
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Plan the job
+        run: chmod u+x bin/nomad ; bin/nomad plan ansible.nomad

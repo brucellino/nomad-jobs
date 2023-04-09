@@ -1,6 +1,6 @@
 variable "grafana_version" {
   type = string
-  default = "8.5.0"
+  default = "9.4.7"
   description = "Grafana version"
 }
 
@@ -25,7 +25,7 @@ job "dashboard" {
   # select machines with more than 4GB of RAM
   constraint {
     attribute = "${attr.memory.totalbytes}"
-    value     = "1GB"
+    value     = "500MB"
     operator  = ">="
   }
   update {
@@ -62,8 +62,8 @@ job "dashboard" {
         type = "tcp"
         port = "mysql_server"
         name = "mysql_alive"
-        interval = "20s"
-        timeout = "2s"
+        interval = "30s"
+        timeout = "5s"
       }
     }
 
@@ -105,7 +105,7 @@ job "dashboard" {
 
     service {
       name = "grafana"
-      tags = ["monitoring", "dashboard"]
+      tags = ["monitoring", "dashboard", "urlprefix-/grafana"]
       port = "grafana_server"
 
       check {
@@ -113,8 +113,8 @@ job "dashboard" {
         name     = "grafana-api"
         path     = "/api/health"
         type     = "http"
-        interval = "20s"
-        timeout  = "5s"
+        interval = "10m"
+        timeout  = "10s"
       }
     }
 
@@ -141,7 +141,7 @@ job "dashboard" {
       }
       resources {
         cpu    = 1000
-        memory = 1024
+        memory = 512
       }
 
       config {
@@ -182,7 +182,7 @@ reporting_enabled = false
 external_enabled = false
 [security]
 admin_user = admin
-admin_password = "admin"
+admin_password = "admin"  #pragma: allowlist secret
 disable_gravatar = true
 [dashboards]
 versions_to_keep = 10

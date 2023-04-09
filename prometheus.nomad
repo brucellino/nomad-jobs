@@ -20,7 +20,7 @@ job "prometheus" {
   }
 
   group "monitoring" {
-    count = 2
+    count = 1
 
     network {
       port "prometheus_ui" {
@@ -65,9 +65,12 @@ scrape_configs:
           {{ range nodes }}
           - {{ .Address}}:9100
           {{ end }}
+  - job_name: 'consul_node_metrics'
+    consul_sd_configs:
+
   - job_name: 'consul_metrics'
     consul_sd_configs:
-      - server: consul.service.consul:8500
+      - server: localhost:8500
         services:
           {{ range services }}
           - {{ .Name }}
@@ -89,8 +92,17 @@ scrape_configs:
     params:
       format: ['prometheus']
   - job_name: 'nomad_metrics'
-    nomad_sd_configs:
-      - server: http://nomad.service.consul:4646
+    consul_sd_configs:
+      - server: http://consul.service.consul:8500
+        services: ['nomad-client', 'nomad']
+    relabel_configs:
+      - source_labels: ['__meta_consul_tags']
+        regex: '(.*)http(.*)'
+        action: keep
+    scrape_interval: 5s
+    metrics_path: /v1/metrics
+    params:
+      format: ['prometheus']
 EOH
       }
 
