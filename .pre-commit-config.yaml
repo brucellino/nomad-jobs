@@ -26,14 +26,5 @@ repos:
     rev: v1.26.3
     hooks:
       - id: tfsec-system
-
-  - repo: local
-    hooks:
-      - id: packer-fmt
-        name: Packer Format
-        language: system
-        types:
-          - hcl
-        entry: packer fmt
 ci:
   autoupdate_branch: main
