@@ -20,6 +20,10 @@ jobs:
     needs: tailscale
     runs-on: ubuntu-22.04
     steps:
+      - name: Checkout change
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
       - name: Get Vault
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/vault/1.13.1/vault_1.13.1_linux_amd64.zip | gunzip -> bin/vault
@@ -28,10 +32,5 @@ jobs:
       - name: Get Nomad
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
-      - name: Checkout change
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-
       - name: Plan the job
         run: ls -lht bin ; chmod u+x bin/* ; bin/nomad plan ansible.nomad
