@@ -7,11 +7,11 @@ server:
   http_server_read_timeout: "40s"
   http_server_write_timeout: "50s"
 
-{{/* distributor:
+distributor:
   ring:
     kvstore:
       store: consul
-      prefix: loki/collectors */}}
+      prefix: loki/collectors
 
 ingester:
   lifecycler:

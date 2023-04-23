@@ -28,12 +28,8 @@ job "loki" {
     count = 1
 
     network {
-      port "http" {
-        static = 3100
-      }
-      port "grpc" {
-        static = 9096
-      }
+      port "http" {}
+      port "grpc" {}
     }
     service {
       name = "loki-http-server"
