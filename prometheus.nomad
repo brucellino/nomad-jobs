@@ -21,7 +21,11 @@ job "prometheus" {
 
   group "monitoring" {
     count = 1
-
+    volume "data" {
+      type      = "host"
+      read_only = false
+      source    = "scratch"
+    }
     network {
       port "prometheus_ui" {
         to = 9090
@@ -193,9 +197,13 @@ EOH
           "--storage.tsdb.retention.size=1GB",
           "--storage.tsdb.retention.time=7d",
           "--web.external-url=${NOMAD_PORT_prometheus_ui}/prometheus"
-          ]
+        ]
       }
-
+      volume_mount {
+        volume      = "data"
+        destination = "data"
+        read_only   = false
+      }
       resources {
         cpu = 250
         memory = 400
