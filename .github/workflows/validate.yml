@@ -33,6 +33,6 @@ jobs:
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
       - name: check connectivity
-        run: host sense
+        run: host sense.orca-ordinal.ts.net
       - name: Plan the job
         run: NOMAD_ADDR=http://sense:4646 bin/nomad plan ansible.nomad
