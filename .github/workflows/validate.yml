@@ -22,7 +22,6 @@ jobs:
           echo "NOMAD_FILES_CHANGED=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep .nomad | xargs) >> $GITHUB_OUTPUT"
 
   nomad-plan:
-    if: ${{ steps.changedfiles.outputs.nomad }}
     needs: changedfiles
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
