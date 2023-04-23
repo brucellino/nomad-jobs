@@ -27,11 +27,11 @@ jobs:
         run: chmod u+x bin/vault ; bin/vault -version
       - name: Get Nomad
         run: |
-          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
       - name: Checkout change
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
 
       - name: Plan the job
-        run: chmod u+x bin/nomad ; bin/nomad plan ansible.nomad
+        run: chmod u+x ./bin/nomad ; ls -lht bin ; bin/nomad plan ansible.nomad
