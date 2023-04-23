@@ -31,4 +31,4 @@ jobs:
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
       - name: Plan the job
-        run: bin/nomad plan ansible.nomad
+        run: chmod a+x bin/nomad ; bin/nomad plan ansible.nomad
