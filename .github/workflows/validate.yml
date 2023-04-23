@@ -7,7 +7,7 @@ on:
       - '**.nomad'
 
 jobs:
-  tailscale:
+  nomad-plan:
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
     runs-on: ubuntu-22.04
@@ -16,10 +16,6 @@ jobs:
         uses: tailscale/github-action@main
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-  nomad-plan:
-    needs: tailscale
-    runs-on: ubuntu-22.04
-    steps:
       - name: check connectivity
         run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
