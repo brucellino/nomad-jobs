@@ -27,9 +27,7 @@ job "prometheus" {
       source    = "scratch"
     }
     network {
-      port "prometheus_ui" {
-        to = 9090
-      }
+      port "prometheus_ui" {}
     }
 
     restart {
@@ -196,13 +194,14 @@ EOH
           "--config.file=local/prometheus.yml",
           "--storage.tsdb.retention.size=1GB",
           "--storage.tsdb.retention.time=7d",
-          "--storage.tsdb.path=/data",
-          "--web.external-url=${NOMAD_PORT_prometheus_ui}/prometheus"
+          "--web.listen-address=:${NOMAD_PORT_prometheus_ui}",
+          "--web.enable-admin-api",
+          "--storage.tsdb.path=data"
         ]
       }
       volume_mount {
         volume      = "data"
-        destination = "/data"
+        destination = "data"
         read_only   = false
       }
       resources {
