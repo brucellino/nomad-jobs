@@ -24,7 +24,7 @@ jobs:
 
   nomad-plan:
     if: ${{ needs.changedfiles.outputs.nomad }}
-    needs: changefiles
+    needs: changedfiles
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
     runs-on: ubuntu-22.04
