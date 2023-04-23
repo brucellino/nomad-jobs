@@ -14,11 +14,13 @@ job "nodered" {
   }
   group "automation" {
     count = 1
-
+    constraint {
+      attribute = "${attr.unique.consul.name}"
+      operator = "=="
+      value = "sense"
+    }
     network {
-      port "ui" {
-        static = 1880
-      }
+      port "ui" {}
     }
 
     service {
@@ -70,14 +72,15 @@ EOT
       resources {
         cpu  = 250
         memory = 256
-        memory_max = 512
+        // memory_max = 512
       }
     } // install task
 
     task "nodered" {
-      driver = "raw_exec"
+      driver = "exec"
       env {
         XDG_CONFIG_HOME = "${NOMAD_ALLOC_DIR}"
+        PORT = "${NOMAD_PORT_ui}"
       }
       template {
         destination = "run.sh"
@@ -105,6 +108,9 @@ module.exports = {
     }
   },
   editorTheme: {
+    page: {
+      title: "${NOMAD_TASK_NAME} (${NOMAD_JOB_ID})"
+    },
     theme: "solarized-dark",
     codeEditor: {
       lib: "monaco",
@@ -127,7 +133,7 @@ EOT
       resources {
         cores = 1
         memory = 1024
-        memory_max = 2048
+        // memory_max = 2048
       }
     }
   }
