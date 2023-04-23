@@ -34,4 +34,4 @@ jobs:
           fetch-depth: 0
 
       - name: Plan the job
-        run: chmod u+x ./bin/nomad ; ls -lht bin ; bin/nomad plan ansible.nomad
+        run: ls -lht bin ; chmod u+x bin/* ; bin/nomad plan ansible.nomad
