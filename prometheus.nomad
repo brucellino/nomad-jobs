@@ -196,12 +196,13 @@ EOH
           "--config.file=local/prometheus.yml",
           "--storage.tsdb.retention.size=1GB",
           "--storage.tsdb.retention.time=7d",
+          "--storage.tsdb.path=/data",
           "--web.external-url=${NOMAD_PORT_prometheus_ui}/prometheus"
         ]
       }
       volume_mount {
         volume      = "data"
-        destination = "data"
+        destination = "/data"
         read_only   = false
       }
       resources {

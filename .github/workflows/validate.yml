@@ -19,11 +19,10 @@ jobs:
         id: changes
         # Set outputs
         run: |
-          echo "::set-output name=all::$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | xargs)"
-          echo "::set-output name=nomad::$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep .nomad | xargs)"
+          echo "NOMAD_FILES_CHANGED=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep .nomad | xargs) >> $GITHUB_OUTPUT"
 
   nomad-plan:
-    if: ${{ needs.changedfiles.outputs.nomad }}
+    if: ${{ steps.changedfiles.outputs.nomad }}
     needs: changedfiles
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
@@ -48,4 +47,4 @@ jobs:
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
       - name: Plan the job
-        run: chmod a+x bin/nomad ; for file in $(${{needs.changedfiles.outputs.ts}}) ; do bin/nomad plan ${file} ; done
+        run: chmod a+x bin/nomad ; for file in $(${{steps.changedfiles.outputs.nomad}}) ; do bin/nomad plan ${file} ; done
