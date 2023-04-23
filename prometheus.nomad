@@ -217,7 +217,7 @@ EOH
         check {
           name     = "prometheus_ui port alive"
           type     = "http"
-          path     = "prometheus/-/healthy"
+          path     = "-/healthy"
           interval = "10s"
           timeout  = "2s"
         }
