@@ -7,7 +7,24 @@ on:
       - '**.nomad'
 
 jobs:
+  changedfiles:
+    runs-on: ubuntu-latest
+    outputs:
+      all: ${{ steps.changes.outputs.all }}
+      nomad: ${{ steps.changes.outputs.nomad }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v3
+      - name: Get Changed Files
+        id: changes
+        # Set outputs
+        run: |
+          echo "::set-output name=all::$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | xargs)"
+          echo "::set-output name=nomad::$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep .nomad | xargs)"
+
   nomad-plan:
+    if: ${{ needs.changedfiles.outputs.nomad }}
+    needs: changefiles
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
     runs-on: ubuntu-22.04
@@ -31,4 +48,4 @@ jobs:
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
       - name: Plan the job
-        run: chmod a+x bin/nomad ; bin/nomad plan ansible.nomad
+        run: chmod a+x bin/nomad ; for file in $(${{needs.changedfiles.outputs.ts}}) ; do bin/nomad plan ${file} ; done
