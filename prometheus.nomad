@@ -21,16 +21,18 @@ job "prometheus" {
 
   group "monitoring" {
     count = 1
-
+    volume "data" {
+      type      = "host"
+      read_only = false
+      source    = "scratch"
+    }
     network {
-      port "prometheus_ui" {
-        static = 9090
-      }
+      port "prometheus_ui" {}
     }
 
     restart {
-      attempts = 2
-      interval = "5m"
+      attempts = 1
+      interval = "7m"
       delay    = "1m"
       mode     = "fail"
     }
@@ -49,8 +51,13 @@ job "prometheus" {
         }
       }
       template {
-        change_mode = "restart"
+        change_mode = "signal"
+        change_signal = "SIGHUP"
         destination = "local/prometheus.yml"
+        wait {
+          min = "10s"
+          max = "20s"
+        }
         data = <<EOH
 ---
 global:
@@ -107,10 +114,14 @@ EOH
       }
 
       template {
-        change_mode = "restart"
+        change_mode = "noop"
         destination = "local/node-rules.yml"
         left_delimiter = "[["
         right_delimiter = "]]"
+        wait {
+          min = "10s"
+          max = "20s"
+        }
         data = <<EOH
 ---
 groups:
@@ -181,10 +192,18 @@ EOH
         command = "local/prometheus-2.40.2.linux-arm64/prometheus"
         args    = [
           "--config.file=local/prometheus.yml",
-          "--web.external-url=http://0.0.0.0:9090/prometheus"
-          ]
+          "--storage.tsdb.retention.size=1GB",
+          "--storage.tsdb.retention.time=7d",
+          "--web.listen-address=:${NOMAD_PORT_prometheus_ui}",
+          "--web.enable-admin-api",
+          "--storage.tsdb.path=data"
+        ]
       }
-
+      volume_mount {
+        volume      = "data"
+        destination = "data"
+        read_only   = false
+      }
       resources {
         cpu = 250
         memory = 400
@@ -198,7 +217,7 @@ EOH
         check {
           name     = "prometheus_ui port alive"
           type     = "http"
-          path     = "prometheus/-/healthy"
+          path     = "-/healthy"
           interval = "10s"
           timeout  = "2s"
         }

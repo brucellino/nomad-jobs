@@ -7,31 +7,45 @@ on:
       - '**.nomad'
 
 jobs:
-  tailscale:
+  changedfiles:
+    runs-on: ubuntu-latest
+    outputs:
+      all: ${{ steps.changes.outputs.all }}
+      nomad: ${{ steps.changes.outputs.nomad }}
+    steps:
+      - name: checkout repo
+        uses: actions/checkout@v3
+      - name: Get Changed Files
+        id: changes
+        # Set outputs
+        run: |
+          echo "NOMAD_FILES_CHANGED=$(git diff --name-only --diff-filter=ACMRT ${{ github.event.pull_request.base.sha }} ${{ github.sha }} | grep .nomad | xargs) >> $GITHUB_OUTPUT"
+
+  nomad-plan:
+    needs: changedfiles
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
     runs-on: ubuntu-22.04
     steps:
+      - name: check
+        run: echo "${{ steps.changes.outputs.NOMAD_FILES_CHANGED }}"
       - name: Setup Tailscale
         uses: tailscale/github-action@main
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-  nomad-plan:
-    needs: tailscale
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Get Vault
-        run: |
-          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/vault/1.12.3/vault_1.12.3_linux_amd64.zip | gunzip -> bin/vault
-      - name: Get token
-        run: chmod u+x bin/vault ; bin/vault -version
-      - name: Get Nomad
-        run: |
-          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.4.4/nomad_1.4.4_linux_amd64.zip | gunzip -> bin/nomad
+      - name: check connectivity
+        run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-
+      - name: Get Vault
+        run: |
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/vault/1.13.1/vault_1.13.1_linux_amd64.zip | gunzip -> bin/vault
+      - name: Get token
+        run: chmod u+x bin/vault ; bin/vault -version
+      - name: Get Nomad
+        run: |
+          mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
       - name: Plan the job
-        run: chmod u+x bin/nomad ; bin/nomad plan ansible.nomad
+        run: chmod a+x bin/nomad ; for file in ${{steps.changes.outputs.nomad}} ; do bin/nomad plan ${file} ; done
