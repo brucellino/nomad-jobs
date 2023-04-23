@@ -20,6 +20,8 @@ jobs:
     needs: tailscale
     runs-on: ubuntu-22.04
     steps:
+      - name: check connectivity
+        run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
         uses: actions/checkout@v3
         with:
@@ -32,7 +34,5 @@ jobs:
       - name: Get Nomad
         run: |
           mkdir -p bin ; curl -fSL https://releases.hashicorp.com/nomad/1.5.3/nomad_1.5.3_linux_amd64.zip | gunzip -> bin/nomad ; ls -lht bin
-      - name: check connectivity
-        run: host sense.orca-ordinal.ts.net
       - name: Plan the job
-        run: NOMAD_ADDR=http://sense:4646 bin/nomad plan ansible.nomad
+        run: bin/nomad plan ansible.nomad
