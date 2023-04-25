@@ -1,13 +1,13 @@
 server:
   log_level: info
-  http_listen_port: 9080
-  grpc_listen_port: 9095
+  http_listen_port: {{ env "NOMAD_PORT_http" }}
+  grpc_listen_port: {{ env "NOMAD_PORT_grpc" }}
 
 positions:
   filename: /data/positions.yaml
 
 clients:
-  - url: http://loki-http-server.service.consul:3100/loki/api/v1/push
+  - url: http://{{ range service "loki-http-server" }}{{ .Address }}:{{ .Port }}/loki/api/v1/push{{ end }}
 
 scrape_configs:
 - job_name: consul
