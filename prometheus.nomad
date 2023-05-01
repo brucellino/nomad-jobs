@@ -1,3 +1,15 @@
+variable "prom_version" {
+  default = "2.43.0"
+  type = string
+  description = "Version of prometheus to use"
+}
+
+variable "prom_sha2" {
+  type = string
+  default = "79c4262a27495e5dff45a2ce85495be2394d3eecd51f0366c706f6c9c729f672" #pragma: allowlist secret
+  description = "https://prometheus.io/download/"
+}
+
 job "prometheus" {
   datacenters = ["dc1"]
   type        = "service"
@@ -7,7 +19,7 @@ job "prometheus" {
     backup-target-db = "postgres"
   }
   update {
-    max_parallel = 1
+    max_parallel = 2
     health_check = "checks"
     canary = 1
     auto_promote = true
@@ -19,7 +31,7 @@ job "prometheus" {
      value     = "arm64"
   }
 
-  group "monitoring" {
+  group "server" {
     count = 1
     volume "data" {
       type      = "host"
@@ -43,11 +55,11 @@ job "prometheus" {
 
     task "prometheus" {
       artifact {
-        source      = "https://github.com/prometheus/prometheus/releases/download/v2.40.2/prometheus-2.40.2.linux-arm64.tar.gz"
+        source      = "https://github.com/prometheus/prometheus/releases/download/v${var.prom_version}/prometheus-${var.prom_version}.linux-arm64.tar.gz"
         destination = "local"
 
         options {
-          checksum = "sha256:9f39cf29756106ee4c43fe31d346dcfca58fc275c751dce9f6b50eb3ee31356c"
+          checksum = "sha256:${var.prom_sha2}"
         }
       }
       template {
@@ -66,15 +78,26 @@ global:
 rule_files:
   - 'node-rules.yml'
 scrape_configs:
+  - job_name: 'github_exporters'
+    static_configs:
+      - targets:
+        {{ range service "github-exporter-AAROC-main" }}
+          - {{ .Address }}:{{ .Port }}
+        {{ end }}
+      - targets:
+        {{ range service "github-exporter-personal-main" }}
+          - {{ .Address }}:{{ .Port }}
+        {{ end }}
+      - targets:
+        {{ range service "github-exporter-hah-main" }}
+          - {{ .Address }}:{{ .Port }}
+        {{ end }}
   - job_name: 'instance_metrics'
     static_configs:
       - targets:
           {{ range nodes }}
           - {{ .Address}}:9100
           {{ end }}
-  - job_name: 'consul_node_metrics'
-    consul_sd_configs:
-
   - job_name: 'consul_metrics'
     consul_sd_configs:
       - server: localhost:8500
@@ -98,18 +121,11 @@ scrape_configs:
     metrics_path: /v1/metrics
     params:
       format: ['prometheus']
-  - job_name: 'nomad_metrics'
+  - job_name: exporters
     consul_sd_configs:
-      - server: http://consul.service.consul:8500
-        services: ['nomad-client', 'nomad']
-    relabel_configs:
-      - source_labels: ['__meta_consul_tags']
-        regex: '(.*)http(.*)'
-        action: keep
-    scrape_interval: 5s
-    metrics_path: /v1/metrics
-    params:
-      format: ['prometheus']
+      - server: localhost:8500
+        services:
+          - github-exporter-AAROC-main
 EOH
       }
 
@@ -189,7 +205,7 @@ EOH
       driver = "exec"
 
       config {
-        command = "local/prometheus-2.40.2.linux-arm64/prometheus"
+        command = "local/prometheus-${var.prom_version}.linux-arm64/prometheus"
         args    = [
           "--config.file=local/prometheus.yml",
           "--storage.tsdb.retention.size=1GB",
@@ -215,9 +231,16 @@ EOH
         port = "prometheus_ui"
 
         check {
-          name     = "prometheus_ui port alive"
+          name     = "prometheus_readiness check"
           type     = "http"
-          path     = "-/healthy"
+          path     = "/-/ready"
+          interval = "10s"
+          timeout  = "2s"
+        }
+        check {
+          name     = "prometheus healthiness check"
+          type     = "http"
+          path     = "/-/healthy"
           interval = "10s"
           timeout  = "2s"
         }

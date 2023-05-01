@@ -39,7 +39,7 @@ job "alertmanager" {
       driver = "raw_exec"
 
       constraint {
-        attribute = "${attr.cpu.arch}"
+        attribute = attr.cpu.arch
         value     = "arm64"
       }
 
