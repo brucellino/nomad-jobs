@@ -6,7 +6,7 @@ variable "prom_version" {
 
 variable "prom_sha2" {
   type = string
-  default = "cfea92d07dfd9a9536d91dff6366d897f752b1068b9540b3e2669b0281bb8ebf" #pragma: allowlist secret
+  default = "79c4262a27495e5dff45a2ce85495be2394d3eecd51f0366c706f6c9c729f672" #pragma: allowlist secret
   description = "https://prometheus.io/download/"
 }
 
@@ -78,6 +78,20 @@ global:
 rule_files:
   - 'node-rules.yml'
 scrape_configs:
+  - job_name: 'github_exporters'
+    static_configs:
+      - targets:
+        {{ range service "github-exporter-AAROC-main" }}
+          - {{ .Address }}:{{ .Port }}
+        {{ end }}
+      - targets:
+        {{ range service "github-exporter-personal-main" }}
+          - {{ .Address }}:{{ .Port }}
+        {{ end }}
+      - targets:
+        {{ range service "github-exporter-hah-main" }}
+          - {{ .Address }}:{{ .Port }}
+        {{ end }}
   - job_name: 'instance_metrics'
     static_configs:
       - targets:
@@ -107,6 +121,11 @@ scrape_configs:
     metrics_path: /v1/metrics
     params:
       format: ['prometheus']
+  - job_name: exporters
+    consul_sd_configs:
+      - server: localhost:8500
+        services:
+          - github-exporter-AAROC-main
 EOH
       }
 
