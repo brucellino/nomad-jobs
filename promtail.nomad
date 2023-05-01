@@ -1,7 +1,7 @@
 variable "promtail_version" {
   description = "Version of Promtail to deploy"
   type = string
-  default = "v2.7.3"
+  default = "2.7.3"
 }
 
 job "promtail" {
@@ -22,12 +22,8 @@ job "promtail" {
       stagger = "30s"
     }
     network {
-      port "http" {
-        static = 9080
-      }
-      port "grpc" {
-        static = 9095
-      }
+      port "http" {}
+      port "grpc" {}
     }
 
     service {
@@ -45,9 +41,10 @@ job "promtail" {
       check {
         name = "Promtail HTTP"
         type = "http"
-        path = "/targets"
+        path = "/ready"
         interval = "10s"
         timeout = "5s"
+        port = "http"
 
         check_restart {
           limit = 2
@@ -57,23 +54,23 @@ job "promtail" {
       }
     }
 
-    // service {
-    //   name = "promtail-grpc"
-    //   tags = ["grpc"]
-    //   port = "grpc"
+    service {
+      name = "promtail-grpc"
+      tags = ["grpc"]
+      port = "grpc"
 
-    //   check {
-    //     name = "promtail-grpc"
-    //     grpc_service = "promtail-grpc"
-    //     type = "grpc"
-    //     interval = "15s"
-    //     timeout = "5s"
-    //     port = "grpc"
-    //     grpc_use_tls = false
-    //     tls_skip_verify = true
-    //   }
+      // check {
+      //   name = "promtail-grpc"
+      //   grpc_service = "promtail-grpc"
+      //   type = "grpc"
+      //   interval = "15s"
+      //   timeout = "5s"
+      //   port = "grpc"
+      //   grpc_use_tls = false
+      //   tls_skip_verify = true
+      // }
 
-    // }
+    }
 
     restart {
       attempts = 1
@@ -83,7 +80,9 @@ job "promtail" {
     }
 
     ephemeral_disk {
-      size = 300
+      size = 11
+      migrate = true
+      sticky = true
     }
 
     task "promtail" {
@@ -97,11 +96,14 @@ job "promtail" {
       }
 
       artifact {
-        source = "https://github.com/grafana/loki/releases/download/v2.7.3/promtail-linux-${attr.cpu.arch}.zip"
+        source = "https://github.com/grafana/loki/releases/download/v${var.promtail_version}/promtail-linux-${attr.cpu.arch}.zip"
         destination = "local/promtail"
         mode = "file"
       }
-
+      logs {
+        max_files = 1
+        max_file_size = 10
+      }
 
       resources {
         cpu    = 60 # 500 MHz
