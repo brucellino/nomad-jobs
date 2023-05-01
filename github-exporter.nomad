@@ -87,7 +87,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
     task "main" {
       driver = "exec"
       env {
-        ORGS              = "brucellino"
+        ORGS              = "AAROC"
         LISTEN_PORT       = "${NOMAD_PORT_exporter}"
         GITHUB_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/gh_token"
       }
@@ -256,7 +256,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
     task "main" {
       driver = "exec"
       env {
-        USERS              = "AAROC"
+        USERS              = "brucellino"
         LISTEN_PORT       = "${NOMAD_PORT_exporter}"
         GITHUB_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/gh_token"
       }
