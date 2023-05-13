@@ -10,7 +10,7 @@ variable "prom_sha2" {
   description = "https://prometheus.io/download/"
 }
 
-job "prometheus" {
+job "monitoring" {
   datacenters = ["dc1"]
   type        = "service"
   meta {
@@ -26,12 +26,18 @@ job "prometheus" {
     auto_revert = true
   }
 
+  migrate {
+    max_parallel = 1
+    health_check = "checks"
+    min_healthy_time = "30s"
+    healthy_deadline = "10m"
+  }
   constraint {
      attribute = attr.cpu.arch
      value     = "arm64"
   }
 
-  group "server" {
+  group "prometheus" {
     count = 1
     volume "data" {
       type      = "host"
@@ -47,6 +53,12 @@ job "prometheus" {
       interval = "7m"
       delay    = "1m"
       mode     = "fail"
+    }
+
+    reschedule {
+      delay = "5m"
+      delay_function = "fibonacci"
+      unlimited = true
     }
 
     ephemeral_disk {
@@ -66,7 +78,7 @@ job "prometheus" {
         change_mode = "signal"
         change_signal = "SIGHUP"
         destination = "local/prometheus.yml"
-        source = file("templates/prometheus.yml.tpl")
+        data = file("templates/prometheus.yml.tpl")
         wait {
           min = "10s"
           max = "20s"
@@ -82,7 +94,7 @@ job "prometheus" {
           min = "10s"
           max = "20s"
         }
-        source = file("templates/node-rules.yml.tpl")
+        data = file("templates/node-rules.yml.tpl")
       }
       driver = "exec"
 
