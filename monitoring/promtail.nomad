@@ -112,7 +112,7 @@ job "promtail" {
 
 
       template {
-         data          = file("promtail.yml.tpl")
+         data          = file("templates/promtail.yml.tpl")
          destination   = "local/promtail.yml"
          change_mode   = "signal"
          change_signal = "SIGHUP"
