@@ -1,0 +1,10 @@
+---
+version: 2
+updates:
+  - directory: /
+    open-pull-requests-limit: 5
+    package-ecosystem: "github-actions"
+    reviewers:
+      - "brucellino"
+    schedule:
+      interval: "weekly"
