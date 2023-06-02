@@ -41,6 +41,17 @@ job "rabbit" {
           timeout = "5s"
         }
       }
+
+      service {
+        name = "rabbitmq-ampq"
+        tags = ["urlprefix-/ampq"]
+        port = "ampq"
+        check {
+          type = "tcp"
+          interval = "30s"
+          timeout = "5s"
+        }
+      }
     }
   }
 }
