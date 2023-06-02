@@ -4,6 +4,10 @@ job "rabbit" {
 
   update {
     max_parallel = 2
+    health_check = "checks"
+    auto_revert = true
+    auto_promote = true
+    canary = 1
   }
 
   group "main" {
