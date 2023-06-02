@@ -52,6 +52,19 @@ job "rabbit" {
           timeout = "5s"
         }
       }
+
+      service {
+        name = "rabbitmq-admin"
+        tags = ["urlprefix-/ampq"]
+        port = "management"
+        check {
+          type = "http"
+          name = "admin_panel"
+          path = "/"
+          interval = "30s"
+          timeout = "5s"
+        }
+      }
     }
   }
 }
