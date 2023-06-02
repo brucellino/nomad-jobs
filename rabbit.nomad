@@ -10,13 +10,13 @@ job "rabbit" {
     network {
       mode = "bridge"
       port "ampq" {
-        static = 5672
+        to = 5672
       }
       port "management" {
-        static = 15672
+        to = 15672
       }
       port "monitoring" {
-        static = 15692
+        to = 15692
       }
     }
     task "management" {
