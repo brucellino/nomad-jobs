@@ -182,11 +182,12 @@ job "monitoring" {
       size = 300
     }
 
-    vault {
-      policies = ["default"]
-    }
-
     task "mimir" {
+      vault {
+        policies = ["default"]
+        change_mode = "signal"
+        change_signal = "SIGHUP"
+      }
       artifact {
         source      = "https://github.com/grafana/mimir/releases/download/mimir-${var.mimir_version}/mimir-linux-arm64"
         destination = "local"
