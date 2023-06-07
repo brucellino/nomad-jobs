@@ -149,7 +149,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       }
       artifact {
         // source = "${var.go_url}/go${var.go_version}.${attr.kernel.name}-${attr.cpu.arch}.tar.gz"
-        source      = "https://go.dev/dl/go1.20.3.linux-arm64.tar.gz"
+        source      = "https://go.dev/dl/go${var.go_version}.linux-arm64.tar.gz"
         destination = "${NOMAD_ALLOC_DIR}/data"
       }
       config {
@@ -234,7 +234,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       }
       artifact {
         // source = "${var.go_url}/go${var.go_version}.${attr.kernel.name}-${attr.cpu.arch}.tar.gz"
-        source      = "https://go.dev/dl/go1.20.3.linux-arm64.tar.gz"
+        source      = "https://go.dev/dl/go${var.go_version}.linux-arm64.tar.gz"
         destination = "${NOMAD_ALLOC_DIR}/data"
       }
       config {
