@@ -1,15 +1,15 @@
 # Do not use this configuration in production.
 # It is for demonstration purposes only.
 multitenancy_enabled: false
-
+{{ with secret "hashiatho.me-v2/mimir_bucket" }}
 common:
   storage:
     backend: s3
     s3:
       endpoint: beb61125927ff6f81b508dec6fdfdfa2.r2.cloudflarestorage.com
       region: auto
-      secret_access_key: {{ with secret "hashiatho.me-v2/mimir_bucket" }}{{ .Data.data.secret_access_key }}{{ end }}
-      access_key_id: {{ with secret "hashiatho.me-v2/mimir_bucket" }}{{ .Data.data.access_key_id }}{{ end }}
+      secret_access_key: {{ .Data.data.secret_access_key }}
+      access_key_id: {{ .Data.data.access_key_id }}
 blocks_storage:
   s3:
     bucket_name: prometheus-mimir
@@ -54,3 +54,4 @@ server:
 store_gateway:
   sharding_ring:
     replication_factor: 1
+{{ end }}

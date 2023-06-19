@@ -184,7 +184,7 @@ job "monitoring" {
 
     task "mimir" {
       vault {
-        policies = ["default"]
+        policies = ["read-only"]
         change_mode = "signal"
         change_signal = "SIGHUP"
       }

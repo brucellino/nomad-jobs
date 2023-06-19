@@ -2,7 +2,16 @@
 global:
   scrape_interval:     20s
   evaluation_interval: 60s
-rule_files:
+remote_write:
+  - url: http://{{ env "NOMAD_ADDR_prometheus_ui" }}/api/v1/push
+
+scrape_configs:
+  - job_name: prometheus
+    honor_labels: true
+    static_configs:
+      - targets: ["{{ env "NOMAD_ADDR_prometheus_ui" }}"]
+
+  rule_files:
   - 'node-rules.yml'
 scrape_configs:
   - job_name: 'github_exporters'
