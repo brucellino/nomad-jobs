@@ -1,3 +1,4 @@
+{{ with secret "hashiatho.me-v2/loki_logs_bucket" }}
 auth_enabled: false
 server:
   http_listen_port: {{ env "NOMAD_PORT_http" }}
@@ -44,10 +45,10 @@ storage_config:
     directory: local/index
   aws:
     bucketnames: hah-logs
-    endpoint: {{ env "s3_endpoint" }}.r2.cloudflarestorage.com
+    endpoint: {{ .Data.data.account_id }}.r2.cloudflarestorage.com
     region: auto
-    access_key_id: {{ env "access_key_id" }}
-    secret_access_key: {{ env "secret_access_key" }}
+    access_key_id: {{ .Data.data.access_key_id }}
+    secret_access_key: {{ .Data.data.secret_access_key }}
     insecure: false
     sse_encryption: false
     http_config:
@@ -56,7 +57,6 @@ storage_config:
     s3forcepathstyle: true
     dynamodb:
       dynamodb_url: inmemory
-
 
 limits_config:
   enforce_metric_name: false
@@ -67,3 +67,4 @@ compactor:
   working_directory: local/data/compactor
   shared_store: filesystem
   compaction_interval: 5m
+{{ end }}

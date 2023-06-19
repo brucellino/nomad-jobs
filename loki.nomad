@@ -3,21 +3,6 @@ variable "loki_version" {
   default = "v2.7.5"
 }
 
-variable "cloudflare_account_id" {
-  type = string
-  description = "Cloudflare Account ID if using r2"
-}
-
-variable "s3_access_key_id" {
-  type = string
-  description = "Access Key ID for S3 object storage"
-}
-
-variable "s3_secret_access_key" {
-  type = string
-  description = "Secret Access Key for S3 object storage"
-}
-
 job "loki" {
   datacenters = ["dc1"]
   type = "service"
@@ -79,11 +64,6 @@ job "loki" {
         args = [
           "-config.file=local/loki.yml"
         ]
-      }
-      env {
-        s3_endpoint = var.cloudflare_account_id
-        access_key_id = var.s3_access_key_id
-        secret_access_key = var.s3_secret_access_key
       }
       resources {
         cpu = 128
