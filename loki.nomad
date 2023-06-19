@@ -57,7 +57,7 @@ job "loki" {
       vault {
         policies = ["read-only"]
         change_mode = "signal"
-        change_signal = "SIGUSR1"
+        change_signal = "SIGHUP"
       }
       config {
         command = "loki"
