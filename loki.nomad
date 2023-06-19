@@ -69,6 +69,11 @@ job "loki" {
 
     task "server" {
       driver = "exec"
+      vault {
+        policies = ["read-only"]
+        change_mode = "signal"
+        change_signal = "SIGUSR1"
+      }
       config {
         command = "loki"
         args = [
