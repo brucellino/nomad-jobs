@@ -3,7 +3,7 @@ global:
   scrape_interval:     20s
   evaluation_interval: 60s
 remote_write:
-  - url: http://{{ env "NOMAD_ADDR_mimir_ui" }}/api/v1/push
+  - url: http://localhost:9999/mimir/api/v1/push
 rule_files:
   - 'node-rules.yml'
 scrape_configs:
