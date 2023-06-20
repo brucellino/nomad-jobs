@@ -22,6 +22,12 @@ variable "mimir_sha2" {
   description = "https://prometheus.io/download/"
 }
 
+variable "grafana_version" {
+  type = string
+  default = "9.4.7"
+  description = "Grafana version"
+}
+
 job "monitoring" {
   datacenters = ["dc1"]
   type        = "service"
@@ -185,7 +191,7 @@ job "monitoring" {
     task "mimir" {
       vault {
         policies = ["read-only"]
-        change_mode = "signal"
+        change_mode = "restart"
         change_signal = "SIGHUP"
       }
       artifact {
@@ -227,7 +233,7 @@ job "monitoring" {
 
       service {
         name = "mimir"
-        tags = ["urlprefix-/mimir"]
+        tags = ["urlprefix-/mimir strip=/mimir"]
         port = "mimir_ui"
 
         check {
@@ -237,6 +243,78 @@ job "monitoring" {
           interval = "10s"
           timeout  = "2s"
         }
+      }
+    }
+  }
+
+  group "db" {
+    count = 1
+    network {
+      port "mysql_server" {
+        static = 3306
+        to = 3306
+      }
+    }
+
+    constraint {
+      attribute = "${attr.cpu.arch}"
+      operator  = "="
+      value     = "arm64"
+    }
+    service {
+      name = "mysql"
+      tags = ["db", "dashboard", "urlprefix-/mysql:3306 proto=tcp"]
+      port = "mysql_server"
+
+      check {
+        type = "tcp"
+        port = "mysql_server"
+        name = "mysql_alive"
+        interval = "30s"
+        timeout = "5s"
+      }
+    }
+
+    restart {
+      attempts = 1
+      interval = "2m"
+      delay = "15s"
+      mode = "fail"
+    }
+
+    update {
+      max_parallel      = 1
+      min_healthy_time  = "20s"
+      healthy_deadline  = "5m"
+      progress_deadline = "10m"
+      auto_revert       = true
+      auto_promote      = true
+      canary            = 1
+    }
+
+    migrate {
+      max_parallel = 1
+      health_check = "checks"
+      min_healthy_time = "15s"
+      healthy_deadline = "5m"
+    }
+
+    task "mysql" {
+      driver = "podman"
+      config {
+        image = "docker://arm64v8/mysql:oracle"
+        ports = ["mysql_server"]
+        // network_mode = "host"
+      }
+      env {
+        MYSQL_ROOT_PASSWORD = "password" # pragma: allowlist secret
+        MYSQL_USER = "mysql"
+        MYSQL_PASSWORD = "password" # pragma: allowlist secret
+        MYSQL_DATABASE = "grafana"
+      }
+      resources {
+        cpu    = 125
+        memory = 512
       }
     }
   }
