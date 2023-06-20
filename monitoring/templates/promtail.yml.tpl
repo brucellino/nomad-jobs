@@ -7,7 +7,7 @@ positions:
   filename: /data/positions.yaml
 
 clients:
-  - url: http://{{ range service "loki-http-server" }}{{ .Address }}:{{ .Port }}/loki/api/v1/push{{ end }}
+  - url: http://localhost:9999/loki/loki/api/v1/push
 
 scrape_configs:
 - job_name: consul
