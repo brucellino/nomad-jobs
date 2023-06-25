@@ -34,10 +34,10 @@ schema_config:
 storage_config:
   aws:
     region: ams3
-    endpoint:  https://{{ key "jobs/loki/s3_endpoint" }}
+    endpoint:  {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}"https://{{ .Data.data.account_id }}{{ end }}
     bucketnames: {{ key "jobs/loki/logs_bucket" }}
-    access_key_id: {{ env "access_key" }}
-    secret_access_key: {{ env "secret_key" }}
+    access_key_id: {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}{{ .Data.data.access_key_id }}{{ end }}
+    secret_access_key: {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}{{ .Data.data.secret_access_key }}{{ end }}
     s3forcepathstyle: true
     insecure: false
     dynamodb:

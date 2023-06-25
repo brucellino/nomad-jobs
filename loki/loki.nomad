@@ -66,6 +66,11 @@ job "loki" {
 
     task "server" {
       driver = "exec"
+      vault {
+        policies = ["read-only"]
+        change_mode = "signal"
+        change_signal = "SIGUSR1"
+      }
       env {
         access_key = var.access_key
         secret_key = var.secret_key
