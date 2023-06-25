@@ -41,5 +41,5 @@ versions_to_keep = 10
 enabled = true
 
 [unified_alerting]
-enabled = false
+enabled = true
 {{ end }}

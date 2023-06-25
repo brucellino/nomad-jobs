@@ -366,11 +366,11 @@ job "monitoring" {
     }
 
     # select machines with more than 4GB of RAM
-    constraint {
-      attribute = "${attr.memory.totalbytes}"
-      value     = "500MB"
-      operator  = ">="
-    }
+    // constraint {
+    //   attribute = "${attr.memory.totalbytes}"
+    //   value     = "500MB"
+    //   operator  = ">="
+    // }
     update {
       max_parallel      = 1
       min_healthy_time  = "20s"
