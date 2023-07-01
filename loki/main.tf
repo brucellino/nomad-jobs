@@ -18,7 +18,7 @@ terraform {
     }
     consul = {
       source  = "hashicorp/consul"
-      version = "2.15.1"
+      version = "2.17.0"
     }
   }
 }
