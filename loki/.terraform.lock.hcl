@@ -25,20 +25,20 @@ provider "registry.terraform.io/digitalocean/digitalocean" {
 }
 
 provider "registry.terraform.io/hashicorp/consul" {
-  version     = "2.17.0"
-  constraints = "2.17.0"
+  version     = "2.18.0"
+  constraints = "2.18.0"
   hashes = [
-    "h1:+/HpJlVxdYZV+HUvyZ6hP1TRebInmoDO5ihjBZ8HjnY=",
-    "h1:/FbD6GXLwjHlYJGSs5TOM3prrCo+I91oIYIuexXnvYc=",
-    "h1:/q2mR1K9J9jF+jii8gUhWHtNeRb+mpvKTPDzbftHJl4=",
-    "h1:HACgIOAwthj9aEW5Z53AsjckfRpYXuZlzmIePJMYwag=",
-    "h1:Jp23Rxr8wkFYLlwGp7g17fhf7QXFPgA/eGJ5W4kDokE=",
-    "h1:QfAtBqLOjRZkg27fjgy/iTutRS+ZYtNhXNFFOSnLAJ0=",
-    "h1:ZE855KBDxOKiSUHjRbq9A9XerTTCGHZs2iEed602Tnk=",
-    "h1:k+8ptRn/iiCnE7mC0LVA8FvnukzKnlD3KAcquPFbtN8=",
-    "h1:nvnXnuY+uczGKWeVAY/PJx5Urvn9j77dRDZL21RCTZE=",
-    "h1:yZBR0LkFMPDg5KXAsz1o6RABWid/m2vd++ZF11v9WT8=",
-    "h1:zMErWCnPjM5LwFWBIjgAuTwsVBwdM662+FTtYkR0Eks=",
+    "h1:42YmA9OjfPKNpZJuZ8Ddvz6ZdlbTYVGA/PZUBHMVd6Q=",
+    "h1:ABHNF3vYoRej5vLiiKR/XYgjhjubsjlVROssc555Vj8=",
+    "h1:GIbc9IimARunBuk+GdxgUX0cnZ2WwFW0IZMyT8E88B8=",
+    "h1:WT30l2XWqrWSAbSBHTQt0JqHaJPGH7OgvNEBYxGyEmQ=",
+    "h1:chuTXs6w7eQg5H8qsmczA8r7URpy+FoPzXqDB4uXOjc=",
+    "h1:fpHbgFUF+uyPCG+RLVJbTjpBHR8EZOxZkCh4e6VB7tY=",
+    "h1:nbXpF1u+u6n4dXXE5sJs1r5RNxFZC+Hmst64CxXooMU=",
+    "h1:qLKB/QWsmZmAvFLxhoMZzdi4mLAnhjjzVcqE19/S/GI=",
+    "h1:qSJIWypkNVrB4qb3giJjzQ0/FZR0fNM+wfPK1vsJWUE=",
+    "h1:rJZVxhY8uMY8qD+fDE1JocyufAR+Vaxy1nQ/Fe9K4z4=",
+    "h1:suby/EWi909AWmBxGgw6AugdsfWsXjgmZ2DKyIoWeY8=",
   ]
 }
 
