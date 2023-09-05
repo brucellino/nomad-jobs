@@ -14,7 +14,7 @@ jobs:
       nomad: ${{ steps.changes.outputs.nomad }}
     steps:
       - name: checkout repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Get Changed Files
         id: changes
         # Set outputs
@@ -36,7 +36,7 @@ jobs:
       - name: check connectivity
         run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
       - name: Get Vault
