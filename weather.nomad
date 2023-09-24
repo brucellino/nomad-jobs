@@ -17,7 +17,7 @@ job "weather" {
   }
 
   periodic {
-    cron             = "*/10 * * * * *"
+    crons             = ["*/15 * * * * *"]
     prohibit_overlap = true
     time_zone        = "Europe/Rome"
   }
