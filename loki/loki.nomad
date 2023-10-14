@@ -1,14 +1,14 @@
-variable "access_key" {
-  type = string
-}
+// variable "access_key" {
+//   type = string
+// }
 
-variable "secret_key" {
-  type = string
-}
+// variable "secret_key" {
+//   type = string
+// }
 
 variable "loki_version" {
   type = string
-  default = "v2.7.1"
+  default = "v2.9.1"
 }
 
 job "loki" {
@@ -71,10 +71,10 @@ job "loki" {
         change_mode = "signal"
         change_signal = "SIGUSR1"
       }
-      env {
-        access_key = var.access_key
-        secret_key = var.secret_key
-      }
+      // env {
+      //   access_key = var.access_key
+      //   secret_key = var.secret_key
+      // }
       config {
         command = "loki"
         args = [

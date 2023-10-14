@@ -8,7 +8,7 @@
 
 variable "loki_version" {
   type = string
-  default = "v2.7.1"
+  default = "v2.9.1"
 }
 
 job "loki" {
@@ -113,13 +113,13 @@ ingester:
 
 schema_config:
   configs:
-  - from: 2020-05-15
-    store: boltdb
-    object_store: filesystem
-    schema: v11
-    index:
-      prefix: index_
-      period: 168h
+    - from: 2020-05-15
+      store: boltdb
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
 
 storage_config:
   boltdb:
