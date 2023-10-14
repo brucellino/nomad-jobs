@@ -27,11 +27,11 @@ schema_config:
   configs:
     - from: "2020-01-01"
       store: aws
-      object_store: aws
+      object_store: s3
       schema: v11
       index:
         prefix: loki_
-    - from: "2023-10-14"
+    - from: "2023-10-15"
       index:
         period: 24h
         prefix: index_
@@ -59,6 +59,10 @@ storage_config:
     cache_location: /data/boltdb-cache
     shared_store: aws
     build_per_tenant_index: true
+  tsdb_shipper:
+    active_index_directory: /data/tsdb-index
+    cache_location: /data/tsdb-cache
+    shared_store: aws
 {{/* ruler:
   storage:
     aws:
