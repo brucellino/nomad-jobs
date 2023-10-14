@@ -1,3 +1,4 @@
+{{ with secret "hashiatho.me-v2/loki_logs_bucket" }}
 auth_enabled: false
 
 server:
@@ -24,29 +25,42 @@ ingester:
   chunk_retain_period: 30s
 schema_config:
   configs:
-    - from: 2020-01-01
+    - from: "2020-01-01"
       store: aws
-      object_store: s3
+      object_store: aws
       schema: v11
       index:
         prefix: loki_
+    - from: "2023-10-14"
+      index:
+        period: 24h
+        prefix: index_
+      object_store: aws
+      schema: v12
+      store: tsdb
 
 storage_config:
   aws:
-    region: ams3
-    endpoint:  {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}"https://{{ .Data.data.account_id }}{{ end }}
-    bucketnames: {{ key "jobs/loki/logs_bucket" }}
-    access_key_id: {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}{{ .Data.data.access_key_id }}{{ end }}
-    secret_access_key: {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}{{ .Data.data.secret_access_key }}{{ end }}
+    region: auto
+    endpoint:  "https://{{ .Data.data.account_id }}r2.cloudflarestorage.com"
+    bucketnames: hah-logs
+    access_key_id: {{ .Data.data.access_key_id }}
+    secret_access_key: {{ .Data.data.secret_access_key }}
     s3forcepathstyle: true
     insecure: false
+    sse_encryption: false
+    http_config:
+      idle_conn_timeout: 90s
+      insecure_skip_verify: false
     dynamodb:
-      dynamodb_url: inmemory:///index
+      dynamodb_url: inmemory:///loki
   boltdb_shipper:
-    active_index_directory: /loki/index
-    cache_location: /loki/index_cache
-    shared_store: s3
-ruler:
+    active_index_directory: /data/index
+    cache_location: /data/boltdb-cache
+    shared_store: aws
+    build_per_tenant_index: true
+{{/* ruler:
   storage:
-    s3:
-      bucketnames: {{ key "jobs/loki/logs_bucket" }}
+    aws:
+      bucketnames: {{ key "jobs/loki/logs_bucket" }} */}}
+{{ end }}

@@ -17,7 +17,7 @@ ingester:
 schema_config:
   configs:
   - from: 2020-05-15
-    store: boltdb
+    store: boltdb-shipper
     object_store: filesystem
     schema: v11
     index:
@@ -25,11 +25,22 @@ schema_config:
       period: 168h
 
 storage_config:
-  boltdb:
-    directory: /tmp/loki/index
+  boltdb-shipper:
+    active_index_directory: /data/loki/index
+    build_per_tenant_index: true
+    cache_location: /data/botdb-cache
+    directory: /data/loki/index
+    shared_store: cloudflare
+  tsdb_shipper:
+  active_index_directory: /data/tsdb-index
+  cache_location: /data/tsdb-cache
+  shared_store: cloudflare
 
   filesystem:
     directory: /tmp/loki/chunks
+
+query_scheduler:
+  max_outstanding_requests_per_tenant: 32768
 
 limits_config:
   enforce_metric_name: false
