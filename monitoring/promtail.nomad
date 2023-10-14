@@ -1,7 +1,7 @@
 variable "promtail_version" {
   description = "Version of Promtail to deploy"
   type = string
-  default = "2.7.3"
+  default = "2.9.1"
 }
 
 job "promtail" {
