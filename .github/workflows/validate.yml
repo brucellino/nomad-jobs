@@ -30,9 +30,11 @@ jobs:
       - name: check
         run: echo "${{ steps.changes.outputs.NOMAD_FILES_CHANGED }}"
       - name: Setup Tailscale
-        uses: tailscale/github-action@main
+        uses: tailscale/github-action@v2
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
+          oauth-secret: ${{ secrets.TAILSCALE_OAUTH_KEY }}
+          tags: tag:ci
       - name: check connectivity
         run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
