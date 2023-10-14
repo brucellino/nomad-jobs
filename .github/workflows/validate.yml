@@ -32,7 +32,7 @@ jobs:
       - name: Setup Tailscale
         uses: tailscale/github-action@main
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          authkey: ${{ secrets.TAILSCALE_OAUTH_KEY }}
       - name: check connectivity
         run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
