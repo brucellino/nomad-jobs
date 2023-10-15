@@ -8,7 +8,7 @@ variable "go_version" {
 variable "plugin_version" {
   type = string
   description = "Version of Hostpath csi plugin to use"
-  default = "1.9.0"
+  default = "1.12.0"
 }
 
 
@@ -17,15 +17,15 @@ job "plugin-csi-hostpath-controller" {
   datacenters = ["dc1"]
   type = "system"
   update {
-    max_parallel      = 1
-    // health_check      = "checks"
-    // min_healthy_time  = "10s"
-    // healthy_deadline  = "5m"
-    // progress_deadline = "10m"
+    max_parallel      = 2
+    health_check      = "checks"
+    min_healthy_time  = "120s"
+    healthy_deadline  = "5m"
+    progress_deadline = "10m"
     auto_revert       = true
     auto_promote      = true
     canary            = 1
-    // stagger           = "30s"
+    stagger           = "30s"
   }
 
   group "controller" {
@@ -88,8 +88,8 @@ PATH=${NOMAD_ALLOC_DIR}/usr/local/go/bin:${PATH} install bin/hostpathplugin ${NO
 
     task "plugin" {
       resources {
-        cpu    = 10 # 10 MHz
-        memory = 25 # 25MB
+        cpu    = 20 # 10 MHz
+        memory = 50 # 25MB
       }
       // service {
       //   tags = ["csi"]
