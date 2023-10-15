@@ -2,7 +2,7 @@
 variable "go_version" {
   type = string
   description = "Version of Go to use for compiling the plugin"
-  default = "1.18.8"
+  default = "1.20.10"
 }
 
 variable "plugin_version" {
