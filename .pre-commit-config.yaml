@@ -26,5 +26,15 @@ repos:
     rev: v1.26.3
     hooks:
       - id: tfsec-system
+  - repo: local
+    hooks:
+      - id: format-jobspec
+        name: Format jobspec
+        language: system
+        entry: nomad
+        args:
+          - fmt
+        files: .*\.nomad
+
 ci:
   autoupdate_branch: main

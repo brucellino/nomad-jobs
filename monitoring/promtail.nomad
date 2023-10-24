@@ -1,25 +1,25 @@
 variable "promtail_version" {
   description = "Version of Promtail to deploy"
-  type = string
-  default = "2.9.1"
+  type        = string
+  default     = "2.9.1"
 }
 
 job "promtail" {
-
+  priority = "90"
   meta {
-    auto-backup = true
-    backup-schedule = "@daily"
+    auto-backup      = true
+    backup-schedule  = "@daily"
     backup-target-db = "postgres"
   }
   datacenters = ["dc1"]
-  type = "system"
+  type        = "system"
 
   group "promtail" {
     count = 1
     update {
-      max_parallel = 3
-      canary = 0
-      stagger = "30s"
+      max_parallel = 2
+      canary       = 1
+      stagger      = "30s"
     }
     network {
       port "http" {}
@@ -39,16 +39,16 @@ job "promtail" {
       }
 
       check {
-        name = "Promtail HTTP"
-        type = "http"
-        path = "/ready"
+        name     = "Promtail HTTP"
+        type     = "http"
+        path     = "/ready"
         interval = "10s"
-        timeout = "5s"
-        port = "http"
+        timeout  = "5s"
+        port     = "http"
 
         check_restart {
-          limit = 2
-          grace = "60s"
+          limit           = 2
+          grace           = "60s"
           ignore_warnings = false
         }
       }
@@ -58,31 +58,19 @@ job "promtail" {
       name = "promtail-grpc"
       tags = ["grpc"]
       port = "grpc"
-
-      // check {
-      //   name = "promtail-grpc"
-      //   grpc_service = "promtail-grpc"
-      //   type = "grpc"
-      //   interval = "15s"
-      //   timeout = "5s"
-      //   port = "grpc"
-      //   grpc_use_tls = false
-      //   tls_skip_verify = true
-      // }
-
     }
 
     restart {
       attempts = 1
       interval = "10m"
-      delay = "15s"
-      mode = "delay"
+      delay    = "15s"
+      mode     = "delay"
     }
 
     ephemeral_disk {
-      size = 11
+      size    = 11
       migrate = true
-      sticky = true
+      sticky  = true
     }
 
     task "promtail" {
@@ -92,30 +80,30 @@ job "promtail" {
 
       config {
         command = "promtail"
-        args = ["-config.file=local/promtail.yml"]
+        args    = ["-config.file=local/promtail.yml"]
       }
 
       artifact {
-        source = "https://github.com/grafana/loki/releases/download/v${var.promtail_version}/promtail-linux-${attr.cpu.arch}.zip"
+        source      = "https://github.com/grafana/loki/releases/download/v${var.promtail_version}/promtail-linux-${attr.cpu.arch}.zip"
         destination = "local/promtail"
-        mode = "file"
+        mode        = "file"
       }
       logs {
-        max_files = 1
+        max_files     = 1
         max_file_size = 10
       }
 
       resources {
-        cpu    = 60 # 500 MHz
-        memory = 125 # 256MB
+        cpu    = 120 # 500 MHz
+        memory = 150 # 256MB
       }
 
 
       template {
-         data          = file("templates/promtail.yml.tpl")
-         destination   = "local/promtail.yml"
-         change_mode   = "signal"
-         change_signal = "SIGHUP"
+        data          = file("templates/promtail.yml.tpl")
+        destination   = "local/promtail.yml"
+        change_mode   = "signal"
+        change_signal = "SIGHUP"
       }
     }
   }
