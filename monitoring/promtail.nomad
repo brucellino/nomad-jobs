@@ -14,7 +14,7 @@ job "promtail" {
   datacenters = ["dc1"]
   type        = "system"
   update {
-        max_parallel      = 2
+    max_parallel      = 2
     health_check      = "checks"
     min_healthy_time  = "10s"
     healthy_deadline  = "5m"

@@ -34,7 +34,7 @@ repos:
         entry: nomad
         args:
           - fmt
-        files: .*\nomad
+        files: nomad
 
 ci:
   autoupdate_branch: main
