@@ -35,6 +35,7 @@ repos:
         args:
           - fmt
         files: nomad
+        exclude: ".*tpl"
 
 ci:
   autoupdate_branch: main
