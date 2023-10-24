@@ -13,7 +13,17 @@ job "promtail" {
   }
   datacenters = ["dc1"]
   type        = "system"
-
+  update {
+    max_parallel      = 2
+    health_check      = "checks"
+    min_healthy_time  = "10s"
+    healthy_deadline  = "5m"
+    progress_deadline = "10m"
+    auto_revert       = true
+    auto_promote      = true
+    canary            = 1
+    stagger           = "30s"
+  }
   group "promtail" {
     count = 1
     update {
@@ -94,7 +104,7 @@ job "promtail" {
       }
 
       resources {
-        cpu    = 120 # 500 MHz
+        cpu    = 250 # 500 MHz
         memory = 150 # 256MB
       }
 
