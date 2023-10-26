@@ -10,7 +10,7 @@ terraform {
     }
     digitalocean = {
       source  = "digitalocean/digitalocean"
-      version = "2.30.0"
+      version = "2.31.0"
     }
     nomad = {
       source  = "hashicorp/nomad"
@@ -18,7 +18,7 @@ terraform {
     }
     consul = {
       source  = "hashicorp/consul"
-      version = "2.18.0"
+      version = "2.19.0"
     }
   }
 }
