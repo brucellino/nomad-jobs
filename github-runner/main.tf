@@ -1,3 +1,8 @@
+# Define the required providers for this workload.
+# We store the state in a Consul cluster.check
+# We create resources in Github and Nomad, which need authentication tokens.
+# The tokens are stored in Vault, which implies the use of the Vault provider.
+#
 terraform {
   backend "consul" {
     scheme = "http"
@@ -23,16 +28,15 @@ terraform {
   }
 }
 
-variable "org_name" {
-  description = "Name of the Github organisation"
-  default     = "SouthAfricaDigitalScience"
+variable "orgs" {
+  description = "Names of the Github organisations"
+  default     = ["AAROC", "Hashi-at-Home", "SouthAfricaDigitalScience"]
   sensitive   = false
-  type        = string
+  type        = set(string)
 }
 
-provider "vault" {
-  address = "http://sense:8200"
-}
+#
+provider "vault" {}
 
 provider "nomad" {}
 
@@ -42,18 +46,19 @@ data "vault_kv_secret_v2" "name" {
 }
 
 provider "github" {
-  token = data.vault_kv_secret_v2.name.data.personal
+  token = data.vault_kv_secret_v2.name.data.org_scope
 }
 
-data "github_organization" "sads" {
-  name = var.org_name
+data "github_organization" "selected" {
+  for_each = var.orgs
+  name     = each.value
 }
 
 locals {
-  runners_api_url = "https://api.github.com/orgs/${var.org_name}/actions/runners"
+  # runners_api_url = "https://api.github.com/orgs/${var.org_name}/actions/runners"
   headers = {
     "Accept"               = "application/vnd.github+json"
-    "Authorization"        = "Bearer ${data.vault_kv_secret_v2.name.data.personal}"
+    "Authorization"        = "Bearer ${data.vault_kv_secret_v2.name.data.org_scope}"
     "X-GitHub-Api-Version" = "2022-11-28"
   }
 }
@@ -61,7 +66,8 @@ locals {
 provider "http" {}
 
 data "http" "runners" {
-  url             = local.runners_api_url
+  for_each        = data.github_organization.selected
+  url             = "https://api.github.com/orgs/${each.value.orgname}/actions/runners"
   request_headers = local.headers
   lifecycle {
     postcondition {
@@ -71,8 +77,15 @@ data "http" "runners" {
   }
 }
 
+
+output "runner_urls" {
+  value = [for e in data.github_organization.selected : "https://api.github.com/orgs/${e.orgname}/actions/runners"]
+}
+
 data "http" "runner_reg_token" {
-  url             = "${local.runners_api_url}/registration-token"
+  for_each = data.github_organization.selected
+  # url             = "${local.runners_api_url}/registration-token"
+  url             = "https://api.github.com/orgs/${each.value.orgname}/actions/runners/registration-token"
   request_headers = local.headers
   method          = "POST"
   lifecycle {
@@ -84,11 +97,13 @@ data "http" "runner_reg_token" {
 }
 
 resource "vault_kv_secret_v2" "runner_registration_token" {
+  for_each = data.http.runner_reg_token
+
   mount = "kv"
-  name  = "github_runner"
+  name  = "github_runner/${each.key}"
   # cas                 = 1
   # delete_all_versions = true
-  data_json = data.http.runner_reg_token.response_body
+  data_json = each.value.body
   custom_metadata {
     data = {
       created_by = "Terraform"
@@ -97,16 +112,11 @@ resource "vault_kv_secret_v2" "runner_registration_token" {
 }
 
 resource "nomad_job" "runner" {
+  for_each = data.github_organization.selected
   jobspec = templatefile("github-runner.nomad.tpl", {
-    token          = jsondecode(vault_kv_secret_v2.runner_registration_token.data_json).token,
-    runner_version = "2.310.2",
-    org_name       = var.org_name
+    registration_token = jsondecode(vault_kv_secret_v2.runner_registration_token[each.key].data_json).token,
+    check_token        = jsondecode(data.vault_kv_secret_v2.name.data_json).runner_check,
+    runner_version     = "2.310.2",
+    org                = each.key
   })
-}
-
-resource "github_actions_runner_group" "arm64" {
-  allows_public_repositories = false
-  name                       = "hashi-at-home"
-  visibility                 = "private"
-  # default                    = false
 }
