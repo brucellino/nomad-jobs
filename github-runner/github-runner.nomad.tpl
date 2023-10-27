@@ -19,7 +19,6 @@ job "github-runner-${org}" {
       config {
         command = "$${NOMAD_ALLOC_DIR}/actions-runner/config.sh"
         args = [
-          "config.sh",
           "--unattended",
           "--url", "https://github.com/${org}",
           "--token", "${token}",
@@ -45,6 +44,15 @@ job "github-runner-${org}" {
           strategy "target-value" {
             target = 2
           }
+        }
+      }
+
+      service {
+        name = "github-runner-${org}"
+        tags = ["github-runner", "${org}"]
+        provider = "consul"
+        meta {
+          GithubOrg = "${org}"
         }
       }
     }
