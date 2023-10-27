@@ -1,29 +1,45 @@
 variable "loki_version" {
-  type = string
+  type    = string
   default = "v2.7.5"
 }
 
 job "loki" {
   datacenters = ["dc1"]
-  type = "service"
-  name = "loki"
-
+  type        = "service"
+  name        = "loki"
+  priority    = 80
   meta {
-    auto-backup = true
-    backup-schedule = "@hourly"
+    auto-backup      = true
+    backup-schedule  = "@hourly"
     backup-target-db = "postgres"
   }
+
   update {
-    max_parallel = 2
-    health_check = "checks"
-    min_healthy_time = "5s"
-    healthy_deadline = "300s"
+    max_parallel      = 2
+    health_check      = "checks"
+    min_healthy_time  = "5s"
+    healthy_deadline  = "300s"
     progress_deadline = "10m"
-    auto_revert = true
-    auto_promote = true
-    canary = 1
+    auto_revert       = true
+    auto_promote      = true
+    canary            = 1
   }
-  priority = 80
+
+  reschedule {
+    interval       = "30m"
+    delay          = "30s"
+    delay_function = "exponential"
+    max_delay      = "1200s"
+    unlimited      = true
+  }
+
+  migrate {
+    max_parallel     = 2
+    health_check     = "checks"
+    min_healthy_time = "10s"
+    healthy_deadline = "5m"
+  }
+
   group "log-server" {
     count = 1
 
@@ -32,18 +48,18 @@ job "loki" {
       port "grpc" {}
     }
     service {
-      name = "loki-http-server"
-      tags = ["urlprefix-/loki strip=/loki"]
-      port = "http"
+      name      = "loki-http-server"
+      tags      = ["urlprefix-/loki strip=/loki"]
+      port      = "http"
       on_update = "require_healthy"
 
       check {
-        name = "loki_ready"
-        type = "http"
-        path = "/ready"
-        port = "http"
+        name     = "loki_ready"
+        type     = "http"
+        path     = "/ready"
+        port     = "http"
         interval = "10s"
-        timeout = "3s"
+        timeout  = "3s"
       }
     }
 
@@ -55,8 +71,8 @@ job "loki" {
     task "server" {
       driver = "exec"
       vault {
-        policies = ["read-only"]
-        change_mode = "signal"
+        policies      = ["read-only"]
+        change_mode   = "signal"
         change_signal = "SIGHUP"
       }
       config {
@@ -66,11 +82,11 @@ job "loki" {
         ]
       }
       resources {
-        cpu = 128
+        cpu    = 1000
         memory = 200
       }
       template {
-        data = file("loki.yml.tpl")
+        data        = file("loki.yml.tpl")
         destination = "local/loki.yml"
         change_mode = "restart"
       }
@@ -79,7 +95,7 @@ job "loki" {
         options { # checksum depends on the cpu arch
         }
         destination = "local/loki"
-        mode = "file"
+        mode        = "file"
       }
     }
   }

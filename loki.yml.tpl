@@ -1,3 +1,7 @@
+{{/*
+  Read the Loki Logs bucket secret. This will have scope throughout the template.
+  See the end of the template for the closing statement.
+*/}}
 {{ with secret "hashiatho.me-v2/loki_logs_bucket" }}
 auth_enabled: false
 server:
@@ -15,7 +19,8 @@ distributor:
 
 ingester:
   lifecycler:
-    address: 127.0.0.1
+    address: {{ env "NOMAD_IP_http" }}
+    port: {{ env "NOMAD_PORT_http" }}
     ring:
       kvstore:
         store: consul
@@ -27,8 +32,10 @@ ingester:
   flush_op_timeout: 20m
 schema_config:
   configs:
-{{/*  store: boltdb-shipper
-      object_store: filesystem*/}}
+{{/*
+    store: boltdb-shipper
+    object_store: filesystem
+*/}}
     - from: 2022-01-01
       store: boltdb-shipper
       object_store: aws
@@ -60,7 +67,7 @@ storage_config:
 
 limits_config:
   enforce_metric_name: false
-  reject_old_samples: true
+  reject_old_samples: false
   reject_old_samples_max_age: 168h
 
 compactor:
