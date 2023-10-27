@@ -1,11 +1,38 @@
 job "github-runner-${org}" {
+
   name = "github-runner-${org}"
+
   datacenters = ["dc1"]
+  migrate {
+    max_parallel     = 2
+    health_check     = "task_states"
+    min_healthy_time = "30s"
+    healthy_deadline = "5m"
+  }
+  update {
+    max_parallel      = 3
+    health_check      = "task_states"
+    min_healthy_time  = "30s"
+    healthy_deadline  = "5m"
+    progress_deadline = "10m"
+    auto_revert       = true
+    auto_promote      = true
+    canary            = 1
+    stagger           = "30s"
+  }
+  reschedule {
+    interval       = "1h"
+    delay          = "30s"
+    delay_function = "exponential"
+    max_delay      = "120s"
+    unlimited      = true
+  }
+
   group "${org}" {
 
     task "configure" {
       env {
-        RUNNER_CFG_PAT = "${token}"
+        RUNNER_CFG_PAT = "${registration_token}"
       }
       lifecycle {
         hook = "prestart"
@@ -21,7 +48,7 @@ job "github-runner-${org}" {
         args = [
           "--unattended",
           "--url", "https://github.com/${org}",
-          "--token", "${token}",
+          "--token", "${registration_token}",
           "--labels", "hah",
           "--ephemeral"
         ]
@@ -33,6 +60,20 @@ job "github-runner-${org}" {
       config {
         command = "$${NOMAD_ALLOC_DIR}/actions-runner/run.sh"
       }
+
+      service {
+        name = "github-runner-${org}"
+        tags = ["github-runner-${org}"]
+        provider = "consul"
+        check {
+          interval = "15s"
+          timeout = "10s"
+          type = "script"
+          command = "$${NOMAD_ALLOC_DIR}/actions-runner/run.sh"
+          args = ["--check", "--url", "https://github.com/${org}", "--pat", "${check_token}" ]
+        }
+      }
+
       scaling "cpu" {
         enabled = true
         min     = 100
@@ -44,15 +85,6 @@ job "github-runner-${org}" {
           strategy "target-value" {
             target = 2
           }
-        }
-      }
-
-      service {
-        name = "github-runner-${org}"
-        tags = ["github-runner", "${org}"]
-        provider = "consul"
-        meta {
-          GithubOrg = "${org}"
         }
       }
     }
@@ -68,7 +100,7 @@ job "github-runner-${org}" {
         args = [
           "remove",
           "--token",
-          "${token}"
+          "${registration_token}"
         ]
       }
     } // remove task
