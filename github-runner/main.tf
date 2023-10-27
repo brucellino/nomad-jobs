@@ -114,8 +114,9 @@ resource "vault_kv_secret_v2" "runner_registration_token" {
 resource "nomad_job" "runner" {
   for_each = data.github_organization.selected
   jobspec = templatefile("github-runner.nomad.tpl", {
-    token          = jsondecode(vault_kv_secret_v2.runner_registration_token[each.key].data_json).token,
-    runner_version = "2.310.2",
-    org            = each.key
+    registration_token = jsondecode(vault_kv_secret_v2.runner_registration_token[each.key].data_json).token,
+    check_token        = jsondecode(data.vault_kv_secret_v2.name.data_json).runner_check,
+    runner_version     = "2.310.2",
+    org                = each.key
   })
 }
