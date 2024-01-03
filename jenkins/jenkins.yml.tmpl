@@ -1,0 +1,71 @@
+{{ with secret "hashiatho.me-v2/jenkins" }}
+---
+jenkins:
+  agentprotocols:
+    - "JNLP4-connect"
+    - "Ping"
+  numExecutors: 0
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:{{ .Data.data.admin_username }}"
+
+  crumbIssuer:
+    strict:
+      checkSessionMatch: false
+  disableRememberMe: false
+  markdownFormatter: "plainText"
+  mode: NORMAL
+  myViewsTabBar: "standard"
+  nodeMonitors:
+    - diskSpaceMonitor:
+        freeSpaceThreshold: "1GB"
+    - tmpSpace:
+        freeSpaceThreshold: "1GB"
+  remotingSecurity:
+    enabled: true
+  systemMessage: "This the best ever message"
+  slaveAgentPort: ${NOMAD_PORT_agent}
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "{{ .Data.data.admin_username }}"
+          password: "{{ .Data.data.admin_password }}"
+  clouds:
+    - nomad:
+        clientPassword: ""
+        name: "nomad"
+        nomadUrl: "http://nomad.service.consul:4646"
+        prune: true
+        serverPassword: ""
+        tlsEnabled: false
+        workerTimeout: 1
+
+security:
+  apiToken:
+    creationOfLegacyTokenEnabled: false
+    tokenGenerationOnCreationEnabled: false
+    usageStatisticsEnabled: true
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: true
+  sSHD:
+    port: -1
+unclassified:
+  prometheusConfiguration:
+    appendParamLabel: true
+    appendStatusLabel: true
+    collectDiskUsage: true
+    collectingMetricsPeriodInSeconds: 60
+    countAbortedBuilds: true
+    countFailedBuilds: true
+    countNotBuiltBuilds: true
+    countSuccessfulBuilds: true
+    countUnstableBuilds: true
+    defaultNamespace: "default"
+    fetchTestResults: true
+    jobAttributeName: "jenkins_job"
+    path: "prometheus"
+    processingDisabledBuilds: false
+    useAuthenticatedEndpoint: false
+{{ end }}
