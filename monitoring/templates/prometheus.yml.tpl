@@ -37,7 +37,7 @@ scrape_configs:
         replacement: $1
         action: replace
     scrape_interval: 5s
-    metrics_path: /v1/metrics
+    metrics_path: /metrics
     params:
       format: ['prometheus']
   - job_name: nomad_metrics

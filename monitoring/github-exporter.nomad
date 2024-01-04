@@ -12,13 +12,13 @@ variable "go_url" {
 variable "exporter_version" {
   type        = string
   description = "Version of the github exporter to use"
-  default     = "1.0.3"
+  default     = "1.0.6"
 }
 
 variable "artifact_url" {
   type        = string
   description = "URL for the artifact -- a GitHub repo"
-  default     = "github.com/infinityworks/github-exporter"
+  default     = "github.com/githubexporter/github-exporter"
 }
 
 job "github-exporter" {
@@ -48,7 +48,7 @@ job "github-exporter" {
       stagger           = "30s"
     }
     task "build" {
-      driver = "exec"
+      driver = "raw_exec"
       lifecycle {
         hook    = "prestart"
         sidecar = false
@@ -65,7 +65,7 @@ job "github-exporter" {
       }
       artifact {
         // source = "${var.go_url}/go${var.go_version}.${attr.kernel.name}-${attr.cpu.arch}.tar.gz"
-        source      = "https://go.dev/dl/go1.20.3.linux-arm64.tar.gz"
+        source      = "https://go.dev/dl/go${var.go_version}.linux-arm64.tar.gz"
         destination = "${NOMAD_ALLOC_DIR}/data"
       }
       config {
@@ -85,7 +85,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       }
     }
     task "main" {
-      driver = "exec"
+      driver = "raw_exec"
       env {
         ORGS              = "AAROC"
         LISTEN_PORT       = "${NOMAD_PORT_exporter}"
@@ -93,12 +93,14 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       }
       template {
         data        = <<EOH
-{{ with secret "kv/data/github" }}{{ .Data.data.exporter_token }}{{ end }}
+{{ with secret "kv/data/github" }}GITHUB_TOKEN={{ .Data.data.exporter_token }}{{ end }}
         EOH
-        destination = "${NOMAD_SECRETS_DIR}/gh_token"
+        env         = true
+        destination = "secrets/.env"
       }
       config {
         command = "${NOMAD_ALLOC_DIR}/data/github_exporter"
+
       }
       service {
         port = "exporter"
@@ -132,7 +134,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       stagger           = "30s"
     }
     task "build" {
-      driver = "exec"
+      driver = "raw_exec"
       lifecycle {
         hook    = "prestart"
         sidecar = false
@@ -170,17 +172,16 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
     }
 
     task "main" {
-      driver = "exec"
+      driver = "raw_exec"
       env {
-        ORGS              = "hashi-at-home"
-        LISTEN_PORT       = "${NOMAD_PORT_exporter}"
-        GITHUB_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/gh_token"
+        ORGS        = "hashi-at-home"
+        LISTEN_PORT = "${NOMAD_PORT_exporter}"
+        // GITHUB_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/.env"
       }
       template {
-        data        = <<EOH
-{{ with secret "kv/data/github" }}{{ .Data.data.exporter_token }}{{ end }}
-        EOH
-        destination = "${NOMAD_SECRETS_DIR}/gh_token"
+        data        = "{{ with secret \"kv/data/github\" }}GITHUB_TOKEN={{ .Data.data.exporter_token }}{{ end }}"
+        env         = true
+        destination = "secrets/.env"
       }
       config {
         command = "${NOMAD_ALLOC_DIR}/data/github_exporter"
@@ -217,7 +218,7 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       stagger           = "30s"
     }
     task "build" {
-      driver = "exec"
+      driver = "raw_exec"
       lifecycle {
         hook    = "prestart"
         sidecar = false
@@ -254,17 +255,18 @@ ${NOMAD_ALLOC_DIR}/data/go/bin/go build -buildvcs=false -o ${NOMAD_ALLOC_DIR}/da
       }
     }
     task "main" {
-      driver = "exec"
+      driver = "raw_exec"
       env {
-        USERS              = "brucellino"
+        USERS             = "brucellino"
         LISTEN_PORT       = "${NOMAD_PORT_exporter}"
         GITHUB_TOKEN_FILE = "${NOMAD_SECRETS_DIR}/gh_token"
       }
       template {
         data        = <<EOH
-{{ with secret "kv/data/github" }}{{ .Data.data.exporter_token }}{{ end }}
+{{ with secret "kv/data/github" }}GITHUB_TOKEN={{ .Data.data.exporter_token }}{{ end }}
         EOH
-        destination = "${NOMAD_SECRETS_DIR}/gh_token"
+        env         = true
+        destination = "secrets/.env"
       }
       config {
         command = "${NOMAD_ALLOC_DIR}/data/github_exporter"
