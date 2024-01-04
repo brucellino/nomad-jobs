@@ -71,7 +71,7 @@ job "loki" {
     task "server" {
       driver = "exec"
       vault {
-        policies      = ["read-only"]
+        // policies      = ["read-only"]
         change_mode   = "signal"
         change_signal = "SIGHUP"
       }
