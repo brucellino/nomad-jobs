@@ -10,6 +10,18 @@ clients:
   - url: http://localhost:9999/loki/loki/api/v1/push
 
 scrape_configs:
+  - job_name: vault
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: vault-server
+          __path__: /var/log/vault.log
+      - targets:
+          - localhost
+        labels:
+          job: vault-agent
+          __path__: /var/log/vault-agent.log
   - job_name: consul
     static_configs:
     - targets:
@@ -24,6 +36,13 @@ scrape_configs:
       labels:
         job: nomad
         __path__: /var/log/nomad*.log
+  - job_name: Nomad Jobs
+    static_configs:
+    - targets:
+        - localhost
+      labels:
+        job: nomad_allocations
+        __path__: /opt/nomad/alloc/*/*/alloc/logs
   - job_name: journal
     journal:
       json: false
@@ -32,6 +51,7 @@ scrape_configs:
       matches: _TRANSPORT=kernel
       labels:
         job: systemd-journal
+
     relabel_configs:
       - source_labels: ['__journal__systemd_unit']
         target_label: 'unit'
