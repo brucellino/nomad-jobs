@@ -1,19 +1,19 @@
 variable "runner_version" {
   description = "Version to use for the github runner.\nSee https://github.com/actions/runner/releases/"
-  default = "2.310.2"
-  type = string
+  default     = "2.310.2"
+  type        = string
 }
 
 variable "github_org" {
   description = "Name of the github org we attach the runner to"
-  default = "SouthAfricaDigitalScience"
-  type = string
+  default     = "AAROC"
+  type        = string
 }
 
 variable "token" {
   description = "Github Personal Access Token"
-  default = "AAQEOZFGCRNN2DT7DBTYXMTEGKUB2"
-  type = string
+  default     = "AAQEOZBRMWMWVTS5EFV534DFLI76E"
+  type        = string
 }
 job "github-runner" {
   datacenters = ["dc1"]
@@ -24,7 +24,7 @@ job "github-runner" {
         source = "https://github.com/actions/runner/releases/download/v${var.runner_version}/actions-runner-linux-${attr.cpu.arch}-${var.runner_version}.tar.gz"
       }
       lifecycle {
-        hook = "prestart"
+        hook    = "prestart"
         sidecar = false
       }
       config {
@@ -46,13 +46,20 @@ job "github-runner" {
       config {
         command = "/bin/bash"
         args = [
-          "local/run.sh"
+          "local/exec.sh"
         ]
+      }
+      template {
+        destination = "local/exec.sh"
+        data        = <<EOH
+#!/bin/bash
+local/config.sh --unattended --url https://github.com/${var.github_org} --token  ${var.token} --labels test
+EOH
       }
     }
     task "remove" {
       lifecycle {
-        hook = "poststop"
+        hook    = "poststop"
         sidecar = false
       }
       driver = "exec"

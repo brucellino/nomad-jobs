@@ -66,16 +66,6 @@ provider "registry.terraform.io/hashicorp/vault" {
   constraints = "~> 3.0"
   hashes = [
     "h1:+MSu9iMAo/4bBfVuKnf1Q+FVj7O1MLk5JO3TxFZ+dHU=",
-    "h1:0EdAX2gaS0I2WNGmFXuV5wECfyd9/LlRm5onWyIdwwM=",
-    "h1:2tkponlaFG9EaHih3JncL3Cpx8AgPjG1DUby/rQRv18=",
-    "h1:4xBH9v6FPSZhvQuxiQ+dTU03U0s+/kCN3MQ7jwGmClI=",
-    "h1:G7oSx70e5BiGsWsJrzb1wWJ4Y07Blqvr6dUreN7P4kU=",
-    "h1:Q7Ql3dhB0VlHyNNfeAPhlnyFIvWMhqX8AKn/sKhVHaM=",
-    "h1:S+X+nelOuXR1E2VEfJREFc/rEx+go08rpEzqp8CRk9A=",
-    "h1:SP6yggdKafep6oE3zFDYNyaFNfnHGnJbChrxPzj1oZ0=",
-    "h1:a+WylOOygFAE6nVK4SdOlcVosMZH4N5jvkW9h5xZrxM=",
-    "h1:goH65qO7uzcQBhSDXHsyBe2z7C0JZXmaPLJZHl1mbnk=",
-    "h1:izlB6ZwVwDs37L8qW7SHZtRLa2Ffu6lIkFif9RYJZcM=",
     "zh:0f5d14007a4ae668cb2f52ed91985ace0169153643026bd44b9cf3704f271ded",
     "zh:2e6b6435f3ee58c0a2c633e05b9e0091d31e653433028e455b681b601ac36712",
     "zh:342bf9ff3f2500576354612fd5b04dd18e9f79d32fc9d913c435db78f72b2c50",
