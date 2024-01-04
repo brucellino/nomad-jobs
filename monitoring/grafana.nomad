@@ -1,6 +1,6 @@
 variable "grafana_version" {
-  type = string
-  default = "9.4.7"
+  type        = string
+  default     = "9.4.7"
   description = "Grafana version"
 }
 
@@ -19,7 +19,7 @@ variable "grafana_version" {
 job "dashboard" {
 
   datacenters = ["dc1"]
-  type = "service"
+  type        = "service"
 
   # Select ARMv7 machines
   constraint {
@@ -39,8 +39,8 @@ job "dashboard" {
   }
 
   migrate {
-    max_parallel = 1
-    health_check = "checks"
+    max_parallel     = 1
+    health_check     = "checks"
     min_healthy_time = "15s"
     healthy_deadline = "5m"
   }
@@ -50,7 +50,7 @@ job "dashboard" {
     network {
       port "mysql_server" {
         static = 3306
-        to = 3306
+        to     = 3306
       }
     }
     service {
@@ -70,8 +70,8 @@ job "dashboard" {
     restart {
       attempts = 1
       interval = "2m"
-      delay = "15s"
-      mode = "fail"
+      delay    = "15s"
+      mode     = "fail"
     }
     task "mysql" {
       leader = true
@@ -82,9 +82,9 @@ job "dashboard" {
       }
       env {
         MYSQL_ROOT_PASSWORD = "password" # pragma: allowlist secret
-        MYSQL_USER = "mysql"
-        MYSQL_PASSWORD = "password" # pragma: allowlist secret
-        MYSQL_DATABASE = "grafana"
+        MYSQL_USER          = "mysql"
+        MYSQL_PASSWORD      = "password" # pragma: allowlist secret
+        MYSQL_DATABASE      = "grafana"
       }
       resources {
         cpu    = 1000
@@ -96,7 +96,7 @@ job "dashboard" {
 
   group "grafana" {
     network {
-      port "grafana_server" { }
+      port "grafana_server" {}
     }
     # select machines with more than 4GB of RAM
     constraint {
@@ -110,7 +110,7 @@ job "dashboard" {
       port = "grafana_server"
 
       check {
-        port = "grafana_server"
+        port     = "grafana_server"
         name     = "grafana-api"
         path     = "/api/health"
         type     = "http"
@@ -122,8 +122,8 @@ job "dashboard" {
     restart {
       attempts = 1
       interval = "2m"
-      delay = "15s"
-      mode = "fail"
+      delay    = "15s"
+      mode     = "fail"
     }
 
     ephemeral_disk {
@@ -137,38 +137,34 @@ job "dashboard" {
       driver = "raw_exec"
       config {
         command = "sh"
-        args = ["-c", "while ! nc -z mysql.service.consul 3306 ; do sleep 1 ; done"]
+        args    = ["-c", "while ! nc -z mysql.service.consul 3306 ; do sleep 1 ; done"]
       }
     }
 
     task "grafana" {
-      driver = "exec"
+      driver = "podman"
       logs {
-        max_files     = 10
+        max_files     = 2
         max_file_size = 15
-      }
-      artifact {
-        // source = local.grafana_url
-        source = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-arm64.tar.gz"
-        destination = "${NOMAD_ALLOC_DIR}"
       }
       resources {
         cpu    = 1000
-        memory = 512
+        memory = 1024
       }
 
       config {
-        command = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/bin/grafana-server"
+        image = "docker://grafana/grafana:${var.grafana_version}"
         args = [
           "-homepath=${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}",
           "--config=${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
         ]
+        ports = ["grafana_server"]
       }
 
       template {
-        data = file("templates/grafana.ini.tpl")
+        data        = file("templates/grafana.ini.tpl")
         destination = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
       } // Configuration template
-    } // Grafana server task
-  } // grafana server group
+    }   // Grafana server task
+  }     // grafana server group
 }

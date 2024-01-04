@@ -1,30 +1,36 @@
 variable "prom_version" {
-  default     = "2.43.0"
+  default     = "2.48.0"
   type        = string
   description = "Version of prometheus to use"
 }
 
 variable "prom_sha2" {
-  type        = string
-  default     = "79c4262a27495e5dff45a2ce85495be2394d3eecd51f0366c706f6c9c729f672" #pragma: allowlist secret
+  type = map(string)
+  default = {
+    arm64 : "79c4262a27495e5dff45a2ce85495be2394d3eecd51f0366c706f6c9c729f672" #pragma: allowlist secret
+    amd64 : "5871ca9e01ae35bb7ab7a129a845a7a80f0e1453f00f776ac564dd41ff4d754e" #pragma: allowlist secret
+  }
   description = "https://prometheus.io/download/"
 }
 
 variable "mimir_version" {
-  default     = "2.8.0"
+  default     = "2.9.3"
   type        = string
   description = "Version of mimir to use"
 }
 
 variable "mimir_sha2" {
-  type        = string
-  default     = "e7d2d401f616b185bded25cfe84f7b6543e169f4d0d8a36e19f7ba124848b712" #pragma: allowlist secret
-  description = "https://prometheus.io/download/"
+  type = map(string)
+  default = {
+    arm64 : "e7d2d401f616b185bded25cfe84f7b6543e169f4d0d8a36e19f7ba124848b712" #pragma: allowlist secret
+    amd64 : "3a1aa0ccb97692989433c9087bfc478e21cc6d879637f19f091a4c13778ce441" #pragma: allowlist secret
+  }
+  description = "See https://github.com/grafana/mimir/releases"
 }
 
 variable "grafana_version" {
   type        = string
-  default     = "9.4.7"
+  default     = "10.2.2"
   description = "Grafana version"
 }
 
@@ -53,16 +59,11 @@ job "monitoring" {
   }
   constraint {
     attribute = attr.cpu.arch
-    value     = "arm64"
+    value     = "amd64"
   }
 
   group "prometheus" {
     count = 1
-    // volume "data" {
-    //   type      = "host"
-    //   read_only = false
-    //   source    = "scratch"
-    // }
     network {
       port "prometheus_ui" {}
     }
@@ -86,12 +87,12 @@ job "monitoring" {
 
     task "prometheus" {
       artifact {
-        source      = "https://github.com/prometheus/prometheus/releases/download/v${var.prom_version}/prometheus-${var.prom_version}.linux-arm64.tar.gz"
+        source      = "https://github.com/prometheus/prometheus/releases/download/v${var.prom_version}/prometheus-${var.prom_version}.linux-amd64.tar.gz"
         destination = "local"
 
-        options {
-          checksum = "sha256:${var.prom_sha2}"
-        }
+        // options {
+        //   checksum = "sha256:${var.prom_sha2}"
+        // }
       }
       template {
         change_mode   = "signal"
@@ -118,7 +119,7 @@ job "monitoring" {
       driver = "exec"
 
       config {
-        command = "local/prometheus-${var.prom_version}.linux-arm64/prometheus"
+        command = "local/prometheus-${var.prom_version}.linux-amd64/prometheus"
         args = [
           "--config.file=local/prometheus.yml",
           "--storage.tsdb.retention.size=1GB",
@@ -128,14 +129,10 @@ job "monitoring" {
           "--storage.tsdb.path=data"
         ]
       }
-      // volume_mount {
-      //   volume      = "data"
-      //   destination = "data"
-      //   read_only   = false
-      // }
+
       resources {
-        cpu    = 250
-        memory = 400
+        cpu    = 1000
+        memory = 1024
       }
 
       service {
@@ -163,11 +160,7 @@ job "monitoring" {
 
   group "mimir" {
     count = 1
-    // volume "data" {
-    //   type      = "host"
-    //   read_only = false
-    //   source    = "scratch"
-    // }
+
     network {
       port "mimir_ui" {}
     }
@@ -176,7 +169,7 @@ job "monitoring" {
       attempts = 1
       interval = "7m"
       delay    = "1m"
-      mode     = "fail"
+      mode     = "delay"
     }
 
     reschedule {
@@ -185,22 +178,40 @@ job "monitoring" {
       unlimited      = true
     }
 
+    update {
+      max_parallel      = 1
+      min_healthy_time  = "20s"
+      healthy_deadline  = "5m"
+      progress_deadline = "15m"
+      auto_revert       = true
+      auto_promote      = true
+      canary            = 1
+    }
+
+    migrate {
+      max_parallel     = 1
+      health_check     = "checks"
+      min_healthy_time = "30s"
+      healthy_deadline = "10m"
+    }
+
     ephemeral_disk {
       size = 300
     }
 
     task "mimir" {
       vault {
-        policies      = ["read-only"]
+        // policies      = ["read-only"]
         change_mode   = "restart"
         change_signal = "SIGHUP"
       }
       artifact {
-        source      = "https://github.com/grafana/mimir/releases/download/mimir-${var.mimir_version}/mimir-linux-arm64"
+        source      = "https://github.com/grafana/mimir/releases/download/mimir-${var.mimir_version}/mimir-linux-amd64"
         destination = "local"
-        options {
-          checksum = "sha256:${var.mimir_sha2}"
-        }
+
+        // options {
+        //   checksum = "sha256:${var.mimir_sha2}"
+        // }
       }
       template {
         change_mode   = "signal"
@@ -216,17 +227,13 @@ job "monitoring" {
       driver = "exec"
 
       config {
-        command = "local/mimir-linux-arm64"
+        command = "local/mimir-linux"
         args = [
           "-server.http-listen-port=${NOMAD_PORT_mimir_ui}",
           "--config.file=local/mimir.yml"
         ]
       }
-      // volume_mount {
-      //   volume      = "data"
-      //   destination = "data"
-      //   read_only   = false
-      // }
+
       resources {
         cpu    = 250
         memory = 400
@@ -263,22 +270,12 @@ job "monitoring" {
     constraint {
       attribute = "${attr.cpu.arch}"
       operator  = "="
-      value     = "arm64"
+      value     = "amd64"
     }
     service {
       name = "mysql"
       tags = ["db", "urlprefix-/mysql:3306 proto=tcp"]
       port = "mysql_server"
-
-      // check {
-      //   type = "script"
-      //   command = "/bin/bash"
-      //   args = ["-c", "mysqld status"]
-      //   name = "mysql_ready"
-      //   interval = "5s"
-      //   timeout = "2s"
-      //   task = "mysql"
-      // }
 
       check {
         type     = "tcp"
@@ -314,9 +311,9 @@ job "monitoring" {
     }
 
     task "mysql" {
-      driver = "podman"
+      driver = "docker"
       config {
-        image        = "docker://arm64v8/mysql:oracle"
+        image        = "mysql:oracle"
         ports        = ["mysql_server"]
         network_mode = "host"
       }
@@ -327,8 +324,8 @@ job "monitoring" {
         MYSQL_DATABASE      = "grafana"
       }
       resources {
-        cpu    = 125
-        memory = 1000
+        cpu    = 500
+        memory = 512
       }
     }
   }
@@ -337,6 +334,20 @@ job "monitoring" {
     count = 1
     network {
       port "grafana_server" {}
+    }
+
+    affinity {
+      attribute = "${memory.totalbytes}"
+      weight    = 50
+      operator  = ">="
+      value     = "307863731"
+    }
+
+    affinity {
+      attribute = "${cpu.frequency}"
+      weight    = 100
+      operator  = ">="
+      value     = "2000"
     }
 
     // volume "grafana_data" {
@@ -373,15 +384,9 @@ job "monitoring" {
     constraint {
       attribute = "${attr.cpu.arch}"
       operator  = "="
-      value     = "arm64"
+      value     = "amd64"
     }
 
-    # select machines with more than 4GB of RAM
-    // constraint {
-    //   attribute = "${attr.memory.totalbytes}"
-    //   value     = "500MB"
-    //   operator  = ">="
-    // }
     update {
       max_parallel      = 1
       min_healthy_time  = "20s"
@@ -399,12 +404,12 @@ job "monitoring" {
       healthy_deadline = "10m"
     }
 
-    ephemeral_disk {
-      size = 200
-    }
+    // ephemeral_disk {
+    //   size = 200
+    // }
 
     vault {
-      policies      = ["read-only"]
+      // policies      = ["read-only"]
       change_mode   = "restart"
       change_signal = "SIGHUP"
     }
@@ -413,7 +418,7 @@ job "monitoring" {
       lifecycle {
         hook = "prestart"
       }
-      driver = "exec"
+      driver = "raw_exec"
       config {
         command = "sh"
         args    = ["-c", "while ! nc -z mysql.service.consul 3306 ; do sleep 1 ; done"]
@@ -425,33 +430,32 @@ job "monitoring" {
     }
 
     task "grafana" {
-      driver = "exec"
+      driver = "docker"
       logs {
-        max_files     = 10
+        max_files     = 1
         max_file_size = 15
       }
-      artifact {
-        // source = local.grafana_url
-        source      = "https://dl.grafana.com/oss/release/grafana-${var.grafana_version}.linux-arm64.tar.gz"
-        destination = "${NOMAD_ALLOC_DIR}"
-      }
+
       resources {
-        cpu    = 1000
-        memory = 512
+        cores  = 1
+        memory = 2048
       }
 
+      env {
+        GF_PATHS_CONFIG = "/local/conf.ini"
+        GF_PATHS_HOME   = "/home/grafana"
+      }
       config {
-        command = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/bin/grafana-server"
-        args = [
-          "-homepath=${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}",
-          "--config=${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
-        ]
+        image        = "grafana/grafana:${var.grafana_version}"
+        ports        = ["grafana_server"]
+        network_mode = "bridge"
       }
 
       template {
-        data = file("templates/grafana.ini.tpl")
-
-        destination = "${NOMAD_ALLOC_DIR}/grafana-${var.grafana_version}/conf/conf.ini"
+        data        = file("templates/grafana.ini.tpl")
+        destination = "local/conf.ini"
+        perms       = "0666"
+        uid         = "472"
       } // Configuration template
     }   // Grafana server task
   }     // grafana server group

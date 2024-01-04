@@ -10,7 +10,8 @@ http_port = ${NOMAD_HOST_PORT_grafana_server}
 
 [database]
 type = mysql
-host = mysql.service.consul:3306
+{% comment %} host = mysql.service.consul:3306 {% endcomment %}
+{{- range service "mysql" }}host = {{ .Address }}:{{ .Port }}{{- end }}
 user = root
 password = """{{ .Data.data.root_password }}"""
 ssl_mode = disable
@@ -20,9 +21,9 @@ ssl_mode = disable
 # server_cert_name = none
 
 [paths]
-data = ${NOMAD_ALLOC_DIR}/data/
-logs = ${NOMAD_ALLOC_DIR}/log/
-plugins = ${NOMAD_ALLOC_DIR}/plugins
+data = /local/data/
+logs = /local/log/
+plugins = /local/plugins
 
 [analytics]
 reporting_enabled = false
@@ -34,6 +35,7 @@ external_enabled = false
 admin_user = admin
 admin_password = {{ .Data.data.grafana_admin_password }}
 disable_gravatar = true
+
 [dashboards]
 versions_to_keep = 10
 
