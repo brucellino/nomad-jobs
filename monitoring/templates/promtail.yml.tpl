@@ -1,14 +1,15 @@
 server:
   log_level: info
+  http_listen_address: {{ env "NOMAD_IP_http" }}
   http_listen_port: {{ env "NOMAD_PORT_http" }}
   grpc_listen_port: {{ env "NOMAD_PORT_grpc" }}
 
 positions:
   filename: /data/positions.yaml
-
+{{ range service "loki-http-server" }}
 clients:
-  - url: http://localhost:9999/loki/loki/api/v1/push
-
+  - url: http://{{ .Address }}:{{ .Port }}/loki/api/v1/push
+{{ end }}
 scrape_configs:
   - job_name: vault
     static_configs:
@@ -42,7 +43,7 @@ scrape_configs:
         - localhost
       labels:
         job: nomad_allocations
-        __path__: /opt/nomad/alloc/*/*/alloc/logs
+        __path__: /opt/nomad/alloc/*/*/alloc/logs/*
   - job_name: journal
     journal:
       json: false
