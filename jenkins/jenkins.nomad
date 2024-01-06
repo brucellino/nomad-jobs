@@ -112,6 +112,7 @@ EOF
     }   // task
 
     task "launch" {
+      vault {}
       env {
         CASC_JENKINS_CONFIG = "alloc/data/jenkins.yml"
         JENKINS_HOME        = "alloc/jenkins"
