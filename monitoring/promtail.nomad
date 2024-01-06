@@ -1,7 +1,7 @@
 variable "promtail_version" {
   description = "Version of Promtail to deploy"
   type        = string
-  default     = "2.9.1"
+  default     = "2.9.3"
 }
 
 job "promtail" {
@@ -112,7 +112,7 @@ job "promtail" {
       template {
         data          = file("templates/promtail.yml.tpl")
         destination   = "local/promtail.yml"
-        change_mode   = "signal"
+        change_mode   = "restart"
         change_signal = "SIGHUP"
       }
     }
