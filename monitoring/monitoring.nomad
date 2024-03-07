@@ -14,7 +14,7 @@ variable "prom_sha2" {
 }
 
 variable "mimir_version" {
-  default     = "2.9.3"
+  default     = "2.11.0"
   type        = string
   description = "Version of mimir to use"
 }
@@ -22,8 +22,8 @@ variable "mimir_version" {
 variable "mimir_sha2" {
   type = map(string)
   default = {
-    arm64 : "e7d2d401f616b185bded25cfe84f7b6543e169f4d0d8a36e19f7ba124848b712" #pragma: allowlist secret
-    amd64 : "3a1aa0ccb97692989433c9087bfc478e21cc6d879637f19f091a4c13778ce441" #pragma: allowlist secret
+    arm64 : "1e48254e1038684232ebd945523d6c7839b5f7a66f68e6caeade58cdf1183aa7" #pragma: allowlist secret
+    amd64 : "cc72ee1fbe411ddf4851a033b278ecdc3294783eee3c1f98c7234e1bddecdb90" #pragma: allowlist secret
   }
   description = "See https://github.com/grafana/mimir/releases"
 }
@@ -137,8 +137,12 @@ job "monitoring" {
 
       service {
         name = "prometheus"
-        tags = ["urlprefix-/prometheus"]
         port = "prometheus_ui"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.http.rule=Path(`/prometheus`)"
+        ]
+
 
         check {
           name     = "prometheus_readiness check"
@@ -207,7 +211,8 @@ job "monitoring" {
       }
       artifact {
         source      = "https://github.com/grafana/mimir/releases/download/mimir-${var.mimir_version}/mimir-linux-amd64"
-        destination = "local"
+        destination = "local/mimir-linux"
+        mode        = "file"
 
         // options {
         //   checksum = "sha256:${var.mimir_sha2}"
@@ -224,10 +229,21 @@ job "monitoring" {
         }
       }
 
+      template {
+        data = <<EOT
+#!/bin/bash
+chmod -v a+x local/mimir-linux
+local/mimir-linux "$@"
+        EOT
+
+        destination = "local/start.sh"
+        perms       = "777"
+      }
+
       driver = "exec"
 
       config {
-        command = "local/mimir-linux"
+        command = "local/start.sh"
         args = [
           "-server.http-listen-port=${NOMAD_PORT_mimir_ui}",
           "--config.file=local/mimir.yml"
@@ -241,7 +257,10 @@ job "monitoring" {
 
       service {
         name = "mimir"
-        tags = ["urlprefix-/mimir strip=/mimir"]
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.http.rule=Path(`/mimir`)"
+        ]
         port = "mimir_ui"
 
         provider = "consul"
@@ -274,7 +293,10 @@ job "monitoring" {
     }
     service {
       name = "mysql"
-      tags = ["db", "urlprefix-/mysql:3306 proto=tcp"]
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.http.rule=Path(`/mysql`)"
+      ]
       port = "mysql_server"
 
       check {
@@ -360,7 +382,10 @@ job "monitoring" {
 
     service {
       name = "grafana"
-      tags = ["urlprefix-/grafana strip=/grafana"]
+      tags = [
+        "traefik.enable=true",
+        "traefik.http.routers.http.rule=Path(`/grafana`)"
+      ]
       port = "grafana_server"
 
       check {
