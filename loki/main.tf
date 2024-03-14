@@ -6,7 +6,7 @@ terraform {
   required_providers {
     vault = {
       source  = "hashicorp/vault"
-      version = "3.25.0"
+      version = "4.0.0"
     }
     digitalocean = {
       source  = "digitalocean/digitalocean"
