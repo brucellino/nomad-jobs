@@ -35,6 +35,7 @@ jobs:
           oauth-client-id: ${{ secrets.TAILSCALE_OAUTH_CLIENT_ID }}
           oauth-secret: ${{ secrets.TAILSCALE_OAUTH_KEY }}
           tags: tag:ci
+          version: 1.58.2
       - name: check connectivity
         run: ifconfig ; host sense.orca-ordinal.ts.net
       - name: Checkout change
