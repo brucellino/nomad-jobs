@@ -1,4 +1,7 @@
-
+variable "consul_esm_version" {
+  type    = string
+  default = "0.7.1"
+}
 
 job "consul-esm" {
   group "main" {
@@ -10,7 +13,7 @@ job "consul-esm" {
         command = "local/consul-esm"
       }
       artifact {
-        source      = "https://releases.hashicorp.com/consul-esm/0.7.1/consul-esm_0.7.1_linux_arm64.zip"
+        source      = "https://releases.hashicorp.com/consul-esm/${var.consul_esm_version}/consul-esm_${var.consul_esm_version}_linux_arm64.zip"
         destination = "local/consul-esm"
         mode        = "file"
       }
