@@ -1,12 +1,40 @@
 variable "consul_esm_version" {
   type    = string
-  default = "0.7.1"
+  default = "0.7.0"
 }
 
 job "consul-esm" {
   group "main" {
-    count = 3
+
+    count = 1
+
+    update {
+      max_parallel     = 1
+      health_check     = "checks"
+      min_healthy_time = "20s"
+      healthy_deadline = "5m"
+      auto_revert      = true
+      auto_promote     = true
+      canary           = 1
+    }
+
+    migrate {
+      max_parallel     = 1
+      health_check     = "checks"
+      min_healthy_time = "10s"
+      healthy_deadline = "5m"
+    }
+
     task "monitor" {
+
+      // scaling {
+      //   enabled = true
+      //   min = 0
+      //   max = 3
+      //   policy {
+
+      //   }
+      // }
 
       driver = "exec"
       config {
