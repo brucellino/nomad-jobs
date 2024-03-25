@@ -51,8 +51,8 @@ job "consul-esm" {
       }
 
       resources {
-        cpu    = 125
-        memory = 125
+        cpu    = 50
+        memory = 25
       }
     }
   }
