@@ -10,7 +10,7 @@ job "consul-esm" {
         to = "9000"
       }
     }
-    count = 1
+    count = 5
 
     update {
       max_parallel     = 1
@@ -84,7 +84,7 @@ telemetry {
 	disable_hostname = false
  	filter_default = false
  	prefix_filter = []
- 	metrics_prefix = "/v1/esm/metrics"
+ 	metrics_prefix = "/metrics"
  	prometheus_retention_time = "30s"
 }
 passing_threshold = 0
