@@ -29,6 +29,20 @@ job "consul-esm" {
       healthy_deadline = "5m"
     }
 
+    restart {
+      interval = "10m"
+      attempts = 3
+      delay    = "1m"
+      mode     = "delay"
+    }
+
+    reschedule {
+      unlimited      = true
+      delay          = "15s"
+      delay_function = "fibonacci"
+      max_delay      = "1h"
+    }
+
     task "monitor" {
       env {
         log_level = "INFO"
