@@ -41,6 +41,10 @@ job "grafana-agent" {
     }
 
     task "agent" {
+      resources {
+        memory = 25
+        cpu    = 25
+      }
       identity {
         name        = "vault"
         aud         = ["vault.io"]
@@ -89,7 +93,8 @@ job "grafana-agent" {
         args = [
           "-config.file", "local/agent.yml",
           "-server.http.address", "${NOMAD_ADDR_http}",
-          "-server.grpc.address", "${NOMAD_ADDR_grpc}"
+          "-server.grpc.address", "${NOMAD_ADDR_grpc}",
+          "-disable-reporting"
         ]
       }
     }
