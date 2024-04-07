@@ -19,6 +19,22 @@ job "grafana-agent" {
   vault {}
   type = "system"
   group "nodes" {
+    restart {
+      render_templates = true
+      attempts         = 2
+      interval         = "5m"
+      mode             = "delay"
+    }
+    update {
+      max_parallel      = 3
+      health_check      = "checks"
+      min_healthy_time  = "10s"
+      healthy_deadline  = "5m"
+      progress_deadline = "10m"
+      auto_revert       = true
+      auto_promote      = true
+      canary            = 1
+    }
     network {
       port "http" {}
       port "grpc" {}
@@ -72,7 +88,8 @@ job "grafana-agent" {
         args = [
           "-config.file", "local/agent.yml",
           "-server.http.address", "${NOMAD_ADDR_http}",
-        "-server.grpc.address", "${NOMAD_ADDR_grpc}"]
+          "-server.grpc.address", "${NOMAD_ADDR_grpc}"
+        ]
       }
     }
   }
