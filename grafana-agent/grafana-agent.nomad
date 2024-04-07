@@ -47,6 +47,7 @@ job "grafana-agent" {
         env         = true
         file        = true
         change_mode = "restart"
+        ttl         = "1h"
       }
 
       service {
