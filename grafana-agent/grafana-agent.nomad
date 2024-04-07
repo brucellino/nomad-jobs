@@ -1,34 +1,29 @@
 variable "graf_agent_rel_url" {
   description = "Base URL for grafana release packages."
+  type        = string
   default     = "https://github.com/grafana/agent/releases/download"
 }
 variable "graf_agent_version" {
   description = "Grafana Agent version to be used."
+  type        = string
   default     = "0.40.3"
-}
-
-variable "gcloud_metrics_id" {
-  description = "Grafana Cloud metrics Id"
-  default     = 988263
-}
-
-variable "gcloud_logs_id" {
-  description = "Grafana Cloud Loki Id"
-  default     = 596739
 }
 
 variable "scrape_interval" {
   description = "Default scrape interval"
+  type        = string
   default     = "60s"
 }
 
 job "grafana-agent" {
   vault {}
+  type = "system"
   group "nodes" {
     network {
       port "http" {}
       port "grpc" {}
     }
+
     task "agent" {
       identity {
         name        = "vault"
@@ -40,7 +35,24 @@ job "grafana-agent" {
 
       service {
         port = "http"
-        name = "grafana-agent-${attr.unique.hostname}-http"
+        name = "grafana-agent-http"
+        check {
+          type     = "http"
+          name     = "agent_health"
+          path     = "/-/healthy"
+          interval = "20s"
+          timeout  = "5s"
+        }
+      }
+
+      service {
+        port = "grpc"
+        name = "grafana-agent-grpc"
+        check {
+          type     = "tcp"
+          interval = "20s"
+          timeout  = "5s"
+        }
       }
       env {
         HOSTNAME = attr.unique.hostname
@@ -57,10 +69,10 @@ job "grafana-agent" {
       }
       config {
         command = "local/grafana-agent"
-        args    = ["-config.file", "local/agent.yml"]
-      }
-      service {
-
+        args = [
+          "-config.file", "local/agent.yml",
+          "-server.http.address", "${NOMAD_ADDR_http}",
+        "-server.grpc.address", "${NOMAD_ADDR_grpc}"]
       }
     }
   }

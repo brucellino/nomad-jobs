@@ -49,8 +49,8 @@ integrations:
   prometheus_remote_write:
     - basic_auth:
         password: '{{ .Data.data.api_key }}'
-        username: '{{ env "GCLOUD_METRICS_ID" }}'
-      url: '{{ env "GCLOUD_METRICS_URL" }}'
+        username: '{{ .Data.data.metrics_id }}'
+      url: '{{ .Data.data.metrics_url }}/api/prom/push'
   node_exporter:
     enabled: true
     # disable unused collectors
