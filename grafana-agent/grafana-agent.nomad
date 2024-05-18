@@ -6,7 +6,7 @@ variable "graf_agent_rel_url" {
 variable "graf_agent_version" {
   description = "Grafana Agent version to be used."
   type        = string
-  default     = "0.40.3"
+  default     = "0.40.4"
 }
 
 variable "scrape_interval" {
@@ -42,8 +42,8 @@ job "grafana-agent" {
 
     task "agent" {
       resources {
-        memory = 25
-        cpu    = 25
+        memory = 125
+        cpu    = 50
       }
       identity {
         name        = "vault"

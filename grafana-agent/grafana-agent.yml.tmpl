@@ -6,7 +6,7 @@ metrics:
     global:
       scrape_interval: 60s
       remote_write:
-        - url: {{ .Data.data.metrics_url }}/api/prom/push
+        - url: {{ .Data.data.metrics_url }}/push
           basic_auth:
             password: '{{ .Data.data.api_key }}'
             username: '{{ .Data.data.metrics_id }}'
@@ -50,7 +50,8 @@ integrations:
     - basic_auth:
         password: '{{ .Data.data.api_key }}'
         username: '{{ .Data.data.metrics_id }}'
-      url: '{{ .Data.data.metrics_url }}/api/prom/push'
+      url: {{ .Data.data.metrics_url }}/push
+
   node_exporter:
     enabled: true
     # disable unused collectors
@@ -64,7 +65,7 @@ integrations:
     netclass_ignored_devices: "^(veth.*|cali.*|[a-f0-9]{15})$"
     netdev_device_exclude: "^(veth.*|cali.*|[a-f0-9]{15})$"
     # disable tmpfs
-    filesystem_fs_types_exclude: "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+    filesystem_fs_types_exclude: "^(autofs|binfmt_misc|bpf|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
     # drop extensive scrape statistics
     relabel_configs:
       - replacement: '{{ env "HOSTNAME" }}'
