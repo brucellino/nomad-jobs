@@ -71,8 +71,8 @@ job "grafana-agent" {
         name = "grafana-agent-grpc"
         check {
           type     = "tcp"
-          interval = "20s"
-          timeout  = "5s"
+          interval = "120s"
+          timeout  = "15s"
         }
       }
       env {
