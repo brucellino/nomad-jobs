@@ -1,0 +1,52 @@
+{{- with secret "hashiatho.me-v2/grafana_cloud" -}}
+server:
+  log_level: info
+metrics:
+  kvstore_config:
+    store: consul
+    prefix: "grafana/configurations/"
+    consul:
+      host: "localhost:8500"
+  wal_directory: tmp/wal
+  global:
+    scrape_interval: 60s
+
+integrations:
+  prometheus_remote_write:
+    - basic_auth:
+        password: '{{ .Data.data.api_key }}'
+        username: '{{ .Data.data.metrics_id }}'
+      url: '{{ .Data.data.metrics_url }}/api/prom/push'
+  agent:
+    enabled: true
+    relabel_configs:
+      - action: replace
+        source_labels:
+          - agent_hostname
+        target_label: instance
+      - action: replace
+        target_label: job
+        replacement: "integrations/agent-check"
+    metric_relabel_configs:
+      - action: keep
+        regex: (prometheus_target_.*|prometheus_sd_discovered_targets|agent_build.*|agent_wal_samples_appended_total|process_start_time_seconds)
+        source_labels:
+          - __name__
+  consul_exporter:
+    enabled: true
+    server: localhost:8500
+    scrape_integration: true
+    scrape_interval: 120s
+    kv_prefix: "hashiatho.me"
+    relabel_configs:
+      - replacement: hashiathome
+        target_label: instance
+      - replacement: "integrations/consul"
+        target_label: job
+    metric_relabel_configs:
+      - action: keep
+        regex: consul_raft_leader|consul_raft_leader_lastcontact_count|consul_raft_peers|consul_up
+        source_labels:
+          - __name__
+
+{{ end }}

@@ -1,0 +1,87 @@
+{{- with secret "hashiatho.me-v2/grafana_cloud" -}}
+integrations:
+  prometheus_remote_write:
+    - basic_auth:
+        password: '{{ .Data.data.api_key }}'
+        username: '{{ .Data.data.metrics_id }}'
+      url: '{{ .Data.data.metrics_url }}/api/prom/push'
+  agent:
+    enabled: true
+    relabel_configs:
+      - action: replace
+        source_labels:
+          - agent_hostname
+        target_label: instance
+
+      - action: replace
+        target_label: job
+        replacement: "integrations/agent-check"
+    metric_relabel_configs:
+      - action: keep
+        regex: (prometheus_target_.*|prometheus_sd_discovered_targets|agent_build.*|agent_wal_samples_appended_total|process_start_time_seconds)
+        source_labels:
+          - __name__
+  consul_exporter:
+    enabled: true
+    server: localhost:8500
+    relabel_configs:
+      - replacement: hashiathome
+        target_label: instance
+      - replacement: "integrations/consul"
+        target_label: job
+    metric_relabel_configs:
+      - action: keep
+        regex: consul_raft_leader|consul_raft_leader_lastcontact_count|consul_raft_peers|consul_up
+        source_labels:
+          - __name__
+
+server:
+  log_level: debug
+metrics:
+  configs:
+    - name: nomad
+      remote_write:
+        - basic_auth:
+            password: {{ .Data.data.api_key }}
+            username: {{ .Data.data.metrics_id }}
+          url: {{ .Data.data.metrics_url }}
+      scrape_configs:
+        - job_name: 'integrations/consul'
+          metrics_path: /v1/agent/metrics
+          params:
+            format: ["prometheus"]
+          scrape_interval: 60s
+          static_configs:
+            - targets: ['localhost:8500']
+              labels:
+                instance: '<your-instance-name>'
+          metric_relabel_configs:
+            - action: keep
+              regex: consul_raft_leader|consul_raft_leader_lastcontact_count|consul_raft_peers|consul_up
+              source_labels:
+                - __name__
+        - job_name: integrations/nomad
+          metrics_path: /v1/metrics
+          params:
+            format: ['prometheus']
+          relabel_configs:
+            - replacement: 'hah'
+              target_label: instance
+          consul_sd_configs:
+            - datacenter: "dc1"
+              services:
+                - nomad
+              tags:
+                - http
+                - nomad
+                - ansible-managed
+              allow_stale: true
+          metric_relabel_configs:
+            - action: keep
+              regex: nomad_client_allocated_cpu|nomad_client_allocated_disk|nomad_client_allocated_memory|nomad_client_allocs_cpu_total_percent|nomad_client_allocs_cpu_total_ticks|nomad_client_allocs_memory_cache|nomad_client_allocs_memory_rss|nomad_client_host_cpu_idle|nomad_client_host_disk_available|nomad_client_host_disk_inodes_percent|nomad_client_host_disk_size|nomad_client_host_memory_available|nomad_client_host_memory_free|nomad_client_host_memory_total|nomad_client_host_memory_used|nomad_client_unallocated_cpu|nomad_client_unallocated_disk|nomad_client_unallocated_memory|nomad_client_uptime
+              source_labels:
+                - __name__
+  wal_directory: tmp/wal
+  global:
+    scrape_interval: 60s
+{{ end }}
