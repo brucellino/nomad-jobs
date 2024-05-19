@@ -7,6 +7,34 @@ variable "glue" {
   }
 }
 
+variable "slapd" {
+  description = "configuration items for slapd"
+  type = object({
+    bdii_var_dir = string
+    db_dir = string,
+    db_conf_dir = string,
+    db_entries = list(string)
+    port = string,
+    ipv6_support = bool
+  })
+
+  default = {
+    # These go under the job alloc directory
+    bdii_var_dir = "data/var/lib/bdii/"
+    db_dir = "data/var/lib/bdii/db"
+    db_conf_dir = "data/etc/bdii"
+    db_entries = [
+      "stats",
+      "glue",
+      "stats",
+      "grid"
+    ],
+    port = "2170",
+    ipv6_support = false
+    schemas_dir = "data/etc/bdii/schemas"
+  }
+}
+
 job "bdii" {
   datacenters = ["dc1"]
   type = "service"
@@ -40,7 +68,9 @@ job "bdii" {
     }
 
     network {
-      port "slapd" {}
+      port "slapd" {
+        to = 2170
+      }
     }
     service {
       name     = "bdii"
@@ -63,49 +93,64 @@ job "bdii" {
       mode = "fail"
     }
 
+    reschedule {
+      unlimited = true
+      interval = "10m"
+      delay = "30s"
+      delay_function = "constant"
+    }
 
-    # affinity {
-    # attribute specifies the name of a node attribute or metadata
-    # attribute = "${node.datacenter}"
+    task "configure-slapd" {
+      env {
+        BDII_VAR_DIR = "${var.slapd.bdii_var_dir}"
+        SLAPD_DB_DIR = "${var.slapd.db_dir}"
+      }
+      # This task provisions the configuration files required for the
+      # configuration of the LDAP server
+      artifact {
+        # This creates ${NOMAD_ALLOC_DIR}/glue-schema
+        source = "${var.glue.url}/v${var.glue.version}.tar.gz"
+        destination = "${NOMAD_ALLOC_DIR}/scratch"
+      }
+      template {
+        data = file("provision_config_files.sh.tmpl")
+        destination = "${NOMAD_ALLOC_DIR}/provision_config_files.sh"
+        perms = "777"
+      }
+      lifecycle {
+        hook = "prestart"
+        sidecar = false
+      }
+      driver = "exec"
+      config {
+        command = "${NOMAD_ALLOC_DIR}/provision_config_files.sh"
+      }
+      volume_mount {
+        volume = "ldap"
+        destination = "/alloc/data"
+        propagation_mode = "bidirectional"
+      }
+    }
 
-    # value specifies the desired attribute value. In this example Nomad
-    # will prefer placement in the "us-west1" datacenter.
-    # value  = "us-west1"
-
-    # weight can be used to indicate relative preference
-    # when the job has more than one affinity. It defaults to 50 if not set.
-    # weight = 100
-    #  }
     task "ldap" {
       # The "driver" parameter specifies the task driver that should be used to
       # run the task.
       driver = "docker"
-
-      # The "config" block specifies the driver configuration, which is passed
-      # directly to the driver to start the task. The details of configurations
-      # are specific to each driver, so please see specific driver
-      # documentation for more information.
       config {
         image = "bitnami/openldap:2.6"
         ports = ["slapd"]
-
-        # The "auth_soft_fail" configuration instructs Nomad to try public
-        # repositories if the task fails to authenticate when pulling images
-        # and the Docker driver has an "auth" configuration block.
         auth_soft_fail = true
-      }
-      artifact {
-        source = "${var.glue.url}/v${var.glue.version}.tar.gz"
       }
       env {
         LDAP_PORT_NUMBER = "${NOMAD_PORT_slapd}"
         // LDAP_EXTRA_SCHEMAS = "inetorgperson,nis,cosine"
         LDAP_ADD_SCHEMAS = "yes"
-        // LDAP_CUSTOM_SCHEMA_DIR = "/etc/glue/LDAP_ADD_SCHEMAS"
+        LDAP_CUSTOM_SCHEMA_DIR = "/etc/glue/LDAP_ADD_SCHEMAS"
         LDAP_LOGLEVEL = 2048
         LDAP_ENABLE_ACCESSLOG = "yes"
         LDAP_ACCESSLOG_LOGOPS = "all"
-
+        BDII_VAR_DIR = "${var.slapd.bdii_var_dir}"
+        SLAPD_DB_DIR = "${var.slapd.db_dir}"
       }
       logs {
         max_files     = 10
@@ -116,69 +161,16 @@ job "bdii" {
         env  = true
         file = true
       }
-
-      # The "resources" block describes the requirements a task needs to
-      # execute. Resource requirements include memory, cpu, and more.
-      # This ensures the task will execute on a machine that contains enough
-      # resource capacity.
-      #
-      # For more information and examples on the "resources" block, please see
-      # the online documentation at:
-      #
-      #     https://developer.hashicorp.com/nomad/docs/job-specification/resources
-      #
       resources {
-        cpu    = 500 # 500 MHz
-        memory = 512 # 512MB
+        cpu    = 125 # 500 MHz
+        memory = 256 # 512MB
       }
 
       volume_mount {
         volume = "ldap"
-        destination = "/data"
+        destination = "/alloc/data"
         propagation_mode = "bidirectional"
       }
-
-
-      #     https://developer.hashicorp.com/nomad/docs/job-specification/template
-      #
-      # template {
-      #   data          = "---\nkey: {{ key \"service/my-key\" }}"
-      #   destination   = "local/file.yml"
-      #   change_mode   = "signal"
-      #   change_signal = "SIGHUP"
-      # }
-
-      # The "template" block can also be used to create environment variables
-      # for tasks that prefer those to config files. The task will be restarted
-      # when data pulled from Consul or Vault changes.
-      #
-      # template {
-      #   data        = "KEY={{ key \"service/my-key\" }}"
-      #   destination = "local/file.env"
-      #   env         = true
-      # }
-
-      # The "vault" block instructs the Nomad client to acquire a token from
-      # a HashiCorp Vault server. The Nomad servers must be configured and
-      # authorized to communicate with Vault. By default, Nomad will inject
-      # The token into the job via an environment variable and make the token
-      # available to the "template" block. The Nomad client handles the renewal
-      # and revocation of the Vault token.
-      #
-      # For more information and examples on the "vault" block, please see
-      # the online documentation at:
-      #
-      #     https://developer.hashicorp.com/nomad/docs/job-specification/vault
-      #
-      # vault {
-      #   policies      = ["cdn", "frontend"]
-      #   change_mode   = "signal"
-      #   change_signal = "SIGHUP"
-      # }
-
-      # Controls the timeout between signalling a task it will be killed
-      # and killing the task. If not set a default is used.
-      # kill_timeout = "20s"
     }
   }
 }
