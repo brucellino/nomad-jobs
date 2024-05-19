@@ -2,7 +2,7 @@ variable "glue" {
   type = map(string)
   description = "Release of the GLUE versions to use"
   default = {
-    url = "https://github.com/EGI-Federation/glue-schema/archive/refs/tags/"
+    url = "https://github.com/EGI-Federation/glue-schema/archive/refs/tags"
     version = "2.1.1"
   }
 }
@@ -21,6 +21,7 @@ job "bdii" {
     healthy_deadline = "5m"
     progress_deadline = "10m"
     auto_revert = true
+    auto_promote = true
     canary = 1
   }
   migrate {
@@ -39,9 +40,7 @@ job "bdii" {
     }
 
     network {
-      port "slapd" {
-        to = 2170
-      }
+      port "slapd" {}
     }
     service {
       name     = "bdii"
@@ -80,14 +79,14 @@ job "bdii" {
     task "ldap" {
       # The "driver" parameter specifies the task driver that should be used to
       # run the task.
-      driver = "podman"
+      driver = "docker"
 
       # The "config" block specifies the driver configuration, which is passed
       # directly to the driver to start the task. The details of configurations
       # are specific to each driver, so please see specific driver
       # documentation for more information.
       config {
-        image = "docker.io/bitnami/openldap:2.6"
+        image = "bitnami/openldap:2.6"
         ports = ["slapd"]
 
         # The "auth_soft_fail" configuration instructs Nomad to try public
@@ -99,10 +98,14 @@ job "bdii" {
         source = "${var.glue.url}/v${var.glue.version}.tar.gz"
       }
       env {
-        LDAP_PORT_NUMBER = 2170
-        LDAP_EXTRA_SCHEMAS = "core,nis,cosine"
+        LDAP_PORT_NUMBER = "${NOMAD_PORT_slapd}"
+        // LDAP_EXTRA_SCHEMAS = "inetorgperson,nis,cosine"
         LDAP_ADD_SCHEMAS = "yes"
-        LDAP_CUSTOM_SCHEMA_DIR = "/var/lib"
+        // LDAP_CUSTOM_SCHEMA_DIR = "/etc/glue/LDAP_ADD_SCHEMAS"
+        LDAP_LOGLEVEL = 2048
+        LDAP_ENABLE_ACCESSLOG = "yes"
+        LDAP_ACCESSLOG_LOGOPS = "all"
+
       }
       logs {
         max_files     = 10
@@ -127,6 +130,12 @@ job "bdii" {
       resources {
         cpu    = 500 # 500 MHz
         memory = 512 # 512MB
+      }
+
+      volume_mount {
+        volume = "ldap"
+        destination = "/data"
+        propagation_mode = "bidirectional"
       }
 
 
