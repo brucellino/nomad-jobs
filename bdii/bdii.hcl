@@ -1,9 +1,35 @@
+variable "bdii" {
+  description = "Configuration items for BDII"
+  type = object({
+    version = string
+    files = list(string)
+  })
+
+  default = {
+    version = "6.0.1"
+    files = [
+      "BDII.schema"
+    ]
+  }
+}
+
 variable "glue" {
-  type = map(string)
-  description = "Release of the GLUE versions to use"
+  description = "Glue schema configuration items"
+  type = object({
+    url = string
+    version = string
+    schemas = list(string)
+  })
   default = {
     url = "https://github.com/EGI-Federation/glue-schema/archive/refs/tags"
     version = "2.1.1"
+    schemas = [
+      "GLUE20.schema",
+      "Glue-CE.schema",
+      "Glue-CESEBind.schema",
+      "Glue-MDS.schema",
+      "Glue-SE.schema"
+    ]
   }
 }
 
@@ -16,6 +42,7 @@ variable "slapd" {
     db_entries = list(string)
     port = string,
     ipv6_support = bool
+    schemas_dir = string
   })
 
   default = {
@@ -31,7 +58,7 @@ variable "slapd" {
     ],
     port = "2170",
     ipv6_support = false
-    schemas_dir = "data/etc/bdii/schemas"
+    schemas_dir = "local/schemas"
   }
 }
 
@@ -69,7 +96,7 @@ job "bdii" {
 
     network {
       port "slapd" {
-        to = 2170
+        static = 2170
       }
     }
     service {
@@ -104,23 +131,21 @@ job "bdii" {
       # The "driver" parameter specifies the task driver that should be used to
       # run the task.
       artifact {
-        # This creates ${NOMAD_ALLOC_DIR}/glue-schema
-        source = "https://github.com/EGI-Federation/glue-schema//etc/ldap/schema/*.schema"
-        destination = "local"
-        mode = "dir"
+        source = "https://github.com/EGI-Federation/glue-schema//etc/ldap/schema"
+        destination = "local/schema"
       }
 
       artifact {
         # BDII Schema directly from EGI-Foundation/bdii
-        source = "https://github.com/EGI-Foundation/bdii.git//etc/BDII.schema"
-        destination = "local"
+        source = "https://raw.githubusercontent.com/EGI-Federation/bdii/v${var.bdii.version}/etc/BDII.schema"
+        destination = "local/schema/BDII.schema"
         mode = "file"
       }
 
       artifact {
         # slapd config EGI-Foundation/bdii
-        source = "https://github.com/EGI-Foundation/bdii.git//etc/bdii-slapd.conf"
-        destination = "local/etc"
+        source = "https://raw.githubusercontent.com/EGI-Foundation/bdii/v${var.bdii.version}/etc/bdii-slapd.conf"
+        destination = "local/etc/bdii-slapd.conf"
         mode = "file"
       }
 
@@ -145,7 +170,7 @@ job "bdii" {
         LDAP_ACCESSLOG_LOGOPS = "all"
         BDII_VAR_DIR = "${var.slapd.bdii_var_dir}"
         SLAPD_DB_DIR = "${var.slapd.db_dir}"
-        LDAP_CUSTOM_SCHEMA_DIR = "/local/etc"
+        LDAP_CUSTOM_SCHEMA_DIR = "/local/schema"
       }
       logs {
         max_files     = 10
