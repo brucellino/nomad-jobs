@@ -20,9 +20,9 @@ variable "slapd" {
 
   default = {
     # These go under the job alloc directory
-    bdii_var_dir = "data/var/lib/bdii/"
-    db_dir = "data/var/lib/bdii/db"
-    db_conf_dir = "data/etc/bdii"
+    bdii_var_dir = "var/lib/bdii/"
+    db_dir = "var/lib/bdii/db"
+    db_conf_dir = "etc/bdii"
     db_entries = [
       "stats",
       "glue",
@@ -100,41 +100,36 @@ job "bdii" {
       delay_function = "constant"
     }
 
-    task "configure-slapd" {
-      env {
-        BDII_VAR_DIR = "${var.slapd.bdii_var_dir}"
-        SLAPD_DB_DIR = "${var.slapd.db_dir}"
-      }
-      # This task provisions the configuration files required for the
-      # configuration of the LDAP server
-      artifact {
-        # This creates ${NOMAD_ALLOC_DIR}/glue-schema
-        source = "${var.glue.url}/v${var.glue.version}.tar.gz"
-        destination = "${NOMAD_ALLOC_DIR}/scratch"
-      }
-      template {
-        data = file("provision_config_files.sh.tmpl")
-        destination = "${NOMAD_ALLOC_DIR}/provision_config_files.sh"
-        perms = "777"
-      }
-      lifecycle {
-        hook = "prestart"
-        sidecar = false
-      }
-      driver = "exec"
-      config {
-        command = "${NOMAD_ALLOC_DIR}/provision_config_files.sh"
-      }
-      volume_mount {
-        volume = "ldap"
-        destination = "/alloc/data"
-        propagation_mode = "bidirectional"
-      }
-    }
-
     task "ldap" {
       # The "driver" parameter specifies the task driver that should be used to
       # run the task.
+      artifact {
+        # This creates ${NOMAD_ALLOC_DIR}/glue-schema
+        source = "https://github.com/EGI-Federation/glue-schema//etc/ldap/schema/*.schema"
+        destination = "local"
+        mode = "dir"
+      }
+
+      artifact {
+        # BDII Schema directly from EGI-Foundation/bdii
+        source = "https://github.com/EGI-Foundation/bdii.git//etc/BDII.schema"
+        destination = "local"
+        mode = "file"
+      }
+
+      artifact {
+        # slapd config EGI-Foundation/bdii
+        source = "https://github.com/EGI-Foundation/bdii.git//etc/bdii-slapd.conf"
+        destination = "local/etc"
+        mode = "file"
+      }
+
+      template {
+        data = file("provision_config_files.sh.tmpl")
+        destination = "/docker-entrypoint-initdb.d/provision_config_files.sh"
+        perms = "777"
+      }
+
       driver = "docker"
       config {
         image = "bitnami/openldap:2.6"
@@ -145,12 +140,12 @@ job "bdii" {
         LDAP_PORT_NUMBER = "${NOMAD_PORT_slapd}"
         // LDAP_EXTRA_SCHEMAS = "inetorgperson,nis,cosine"
         LDAP_ADD_SCHEMAS = "yes"
-        LDAP_CUSTOM_SCHEMA_DIR = "/etc/glue/LDAP_ADD_SCHEMAS"
         LDAP_LOGLEVEL = 2048
         LDAP_ENABLE_ACCESSLOG = "yes"
         LDAP_ACCESSLOG_LOGOPS = "all"
         BDII_VAR_DIR = "${var.slapd.bdii_var_dir}"
         SLAPD_DB_DIR = "${var.slapd.db_dir}"
+        LDAP_CUSTOM_SCHEMA_DIR = "/local/etc"
       }
       logs {
         max_files     = 10
@@ -168,7 +163,7 @@ job "bdii" {
 
       volume_mount {
         volume = "ldap"
-        destination = "/alloc/data"
+        destination = "${NOMAD_ALLOC_DIR}/mount-data"
         propagation_mode = "bidirectional"
       }
     }
