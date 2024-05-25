@@ -96,7 +96,7 @@ job "bdii" {
 
     network {
       port "slapd" {
-        static = 2170
+        to = 2170
       }
     }
     service {
@@ -131,8 +131,9 @@ job "bdii" {
       # The "driver" parameter specifies the task driver that should be used to
       # run the task.
       artifact {
-        source = "https://github.com/EGI-Federation/glue-schema//etc/ldap/schema"
+        source = "github.com/EGI-Federation/glue-schema.git//etc/ldap/schema"
         destination = "local/schema"
+        mode = "dir"
       }
 
       artifact {
@@ -145,14 +146,20 @@ job "bdii" {
       artifact {
         # slapd config EGI-Foundation/bdii
         source = "https://raw.githubusercontent.com/EGI-Foundation/bdii/v${var.bdii.version}/etc/bdii-slapd.conf"
-        destination = "local/etc/bdii-slapd.conf"
+        destination = "/local/etc/bdii-slapd.conf"
         mode = "file"
       }
 
       template {
         data = file("provision_config_files.sh.tmpl")
-        destination = "/docker-entrypoint-initdb.d/provision_config_files.sh"
+        destination = "/docker-entrypoint-initdb.d/start.sh"
         perms = "777"
+      }
+
+      template {
+        data = file("bdii-slapd.conf")
+        destination = "local/bdii-slapd.conf"
+        perms = "0644"
       }
 
       driver = "docker"
@@ -163,14 +170,17 @@ job "bdii" {
       }
       env {
         LDAP_PORT_NUMBER = "${NOMAD_PORT_slapd}"
-        // LDAP_EXTRA_SCHEMAS = "inetorgperson,nis,cosine"
+        // LDAP_CUSTOM_SCHEMA_FILE = "Glue-CORE"
         LDAP_ADD_SCHEMAS = "yes"
+        // LDAP_EXTRA_SCHEMAS = "Glue-CORE"
         LDAP_LOGLEVEL = 2048
         LDAP_ENABLE_ACCESSLOG = "yes"
         LDAP_ACCESSLOG_LOGOPS = "all"
         BDII_VAR_DIR = "${var.slapd.bdii_var_dir}"
         SLAPD_DB_DIR = "${var.slapd.db_dir}"
-        LDAP_CUSTOM_SCHEMA_DIR = "/local/schema"
+        // LDAP_CUSTOM_SCHEMA_DIR = "/local/schema/"
+        // BITNAMI_DEBUG = true
+        LDAP_SKIP_DEFAULT_TREE = "yes"
       }
       logs {
         max_files     = 10
@@ -182,8 +192,8 @@ job "bdii" {
         file = true
       }
       resources {
-        cpu    = 125 # 500 MHz
-        memory = 256 # 512MB
+        cpu    = 500 # 500 MHz
+        memory = 512 # 512MB
       }
 
       volume_mount {
