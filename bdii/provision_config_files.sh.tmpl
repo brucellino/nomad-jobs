@@ -1,0 +1,25 @@
+#!/bin/env bash
+
+# provision_config_files.sh
+# Reproduces part of: https://github.com/EGI-Federation/bdii/blob/main/etc/systemd/bdii-slapd-start
+
+# Provisions files for configuring the openldap server
+
+# Create Database directory
+# was SLAPD_DB_DIR=${SLAPD_DB_DIR:-$BDII_VAR_DIR/db} where SLAPD_DB_DIR is /var/lib/bdii
+# We should mount this into tmpfs, but who knows if that's possible
+
+mkdir -vp {{ env "NOMAD_ALLOC_DIR" }}/mount-data/{{ env "SLAPD_DB_DIR" }}/stats
+mkdir -vp {{ env "NOMAD_ALLOC_DIR" }}/mount-data/{{ env "SLAPD_DB_DIR" }}/glue
+mkdir -vp {{ env "NOMAD_ALLOC_DIR" }}/mount-data/{{ env "SLAPD_DB_DIR" }}/grid
+mkdir -vp {{ env "NOMAD_ALLOC_DIR" }}/mount-data/{{ env "BDII_VAR_DIR" }}/archive
+
+tree {{ env "NOMAD_ALLOC_DIR" }}
+
+
+# Put the DB_CONFIG in grid, stats and glue
+
+
+# Copy schema files into place
+# This should be used by the subsequent task which runs openldap
+cp -vp {{ env "NOMAD_ALLOC_DIR" }}/scratch/glue-schema-2.1.1/etc/ldap/schema/* {{ env "NOMAD_ALLOC_DIR" }}
