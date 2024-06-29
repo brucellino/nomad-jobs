@@ -1,38 +1,48 @@
+# A job to retrieve a consul token from Vault.
 job "consul-backup" {
   datacenters = ["dc1"]
-  type = "batch"
-  periodic {
-    cron = "1-59/5 * * * * *"
-  }
+  type        = "batch"
+  // periodic {
+  //   crons = ["1-59/15 * * * * *"]
+  //       prohibit_overlap = false
+  // }
   group "data" {
     count = 1
     network {}
-    // volume "scratch" {
-    //   type = "host"
-    //   source = "scratch"
-    //   read_only = false
-    // }
-    task "get-terraform" {
-      driver = "exec"
-    lifecycle {
-        hook = "prestart"
-        sidecar = false
-      }
-      config {
-        command = "bash"
-        args = ["-c", "curl https://r1eleases.hashicorp.com/terraform/1.3.4/terraform_1.3.4_linux_arm64.zip | gunzip ->terraform ; chmod u+x terraform"]
-      }
-      // volume_mount {
-      //   volume = "scratch"
-      //   destination = "/volume"
-      //   read_only = false
-      // }
+    vault {
+      env = true
     }
+    restart {
+      attempts = 0
+    }
+
     task "check-consul" {
-      driver = "exec"
+      # Get a vault token so that we can read consul creds
+      template {
+        data        = <<-EOH
+#!/bin/env bash
+echo "Hi there! I'm a dufus"
+# Lookup vault token
+curl -H "X-Vault-Token: ${VAULT_TOKEN}" \
+     -X GET \
+     http://active.vault.service.consul:8200/v1/auth/token/lookup-self > output.json
+cat output.json | jq
+sleep 120
+
+        EOH
+        destination = "local/start.sh"
+        perms       = "777"
+      }
+      template {
+        data        = <<-EOH
+{{ with secret "hashi_at_home/creds/cluster-role" }}{{ .Data.token }}{{ end }}
+      EOH
+        destination = "local/consul_token"
+        perms       = "400"
+      }
+      driver = "raw_exec"
       config {
-        command = "bash"
-        args = ["-c", "consul -version"]
+        command = "local/start.sh"
       }
     }
   }
