@@ -45,8 +45,13 @@ curl -X GET \
   https://api.github.com/repos/brucellino/personal-automation/contents/playbooks/backup-state.yml \
   | jq -r .content \
   | base64 -d > playbook.yml
-pip install --user ansible boto3 botocore
-ansible-playbook -c local -i localhost, playbook.yml
+virtualenv local/execute
+source local/execute/bin/activate
+pip install ansible boto3 botocore
+which ansible
+which ansible-playbook
+which python
+INTERPRETER_PYTHON=local/execute/bin/python3 ansible-playbook -c local -i localhost, playbook.yml
         EOH
         destination = "local/start.sh"
         perms       = "777"
