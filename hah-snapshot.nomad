@@ -23,7 +23,6 @@ job "hah-state-backup" {
 PATH=${HOME}/.local/bin:${PATH}
 source ${NOMAD_SECRETS_DIR}/env
 echo Nomad addr: ${NOMAD_ADDR}
-ecoh
 # Generate Consul Snapshot
 curl -v \
   -X GET \
