@@ -6,19 +6,19 @@ terraform {
   required_providers {
     vault = {
       source  = "hashicorp/vault"
-      version = "4.3.0"
+      version = "4.4.0"
     }
     digitalocean = {
       source  = "digitalocean/digitalocean"
-      version = "2.39.2"
+      version = "2.40.0"
     }
     nomad = {
       source  = "hashicorp/nomad"
-      version = "2.3.0"
+      version = "2.3.1"
     }
     consul = {
       source  = "hashicorp/consul"
-      version = "2.20.0"
+      version = "2.21.0"
     }
   }
 }
