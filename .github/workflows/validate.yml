@@ -25,7 +25,7 @@ jobs:
     needs: changedfiles
     env:
       NOMAD_ADDR: ${{ secrets.NOMAD_ADDR }}
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-24.04
     steps:
       - name: check
         run: echo "${{ steps.changes.outputs.NOMAD_FILES_CHANGED }}"
