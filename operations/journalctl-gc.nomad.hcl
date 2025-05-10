@@ -3,6 +3,7 @@ job "journalctl-gc" {
   type        = "sysbatch"
   region      = "global"
   namespace   = "ops"
+  priority    = 100
 
   periodic {
     crons            = ["@daily"]
