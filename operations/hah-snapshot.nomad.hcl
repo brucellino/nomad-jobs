@@ -6,7 +6,7 @@ job "hah-state-backup" {
   namespace   = "ops"
   periodic {
     crons            = ["0 */6 * * * *"]
-    prohibit_overlap = false
+    prohibit_overlap = true
   }
   group "all" {
     count = 1
@@ -21,6 +21,10 @@ job "hah-state-backup" {
       resources {
         cpu    = 1000
         memory = 1024
+      }
+      artifact {
+        source      = "https://downloads.rclone.org/v1.69.2/rclone-v1.69.2-linux-arm64.zip"
+        destination = "/local"
       }
       # Get a vault token so that we can read consul creds
       template {
@@ -43,32 +47,38 @@ curl -v \
   ${NOMAD_ADDR}/v1/operator/snapshot \
   > ${NOMAD_ALLOC_DIR}/data/nomad_$(date --iso-8601=date).snap
 
-# Get the playbook
-curl -X GET \
-  -H "Accept: applicaton/vnd.github+json" \
-  -H "Authorization: Bearer ${GITHUB_TOKEN}" \
-  -H "X-Github-Api-Version: 2022-11-28" \
-  https://api.github.com/repos/brucellino/personal-automation/contents/playbooks/backup-state.yml \
-  | jq -r .content \
-  | base64 -d > playbook.yml
-virtualenv /local/execute
-source /local/execute/bin/activate
-pip install ansible boto3 botocore hvac
-which python3
-which ansible
-which ansible-playbook
-ansible-playbook -c local -i localhost, playbook.yml
-        EOH
+# # Generate Vault snapshot
+curl -v \
+  -X GET \
+  -H "X-Vault-Token: ${VAULT_TOKEN}" \
+  ${NOMAD_ADDR}/v1/operator/snapshot \
+  > ${NOMAD_ALLOC_DIR}/data/nomad_$(date --iso-8601=date).snap
+
+/local/rclone-v1.69.2-linux-arm64/rclone --config /local/rclone.conf copy ${NOMAD_ALLOC_DIR}/data/consul_$(date --iso-8601=date).snap r2:consul/
+/local/rclone-v1.69.2-linux-arm64/rclone --config /local/rclone.conf copy ${NOMAD_ALLOC_DIR}/data/nomad_$(date --iso-8601=date).snap r2:nomad/
+EOH
         destination = "local/start.sh"
         perms       = "777"
       }
       template {
         data        = <<-EOH
-ANSIBLE_PYTHON_INTERPRETER=/local/execute/bin/python3
+{{ with secret "cloudflare/data/hah_state_backup" }}
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = {{ .Data.data.access_key_id }}
+secret_access_key = {{ .Data.data.secret_key }}
+endpoint = {{ .Data.data.s3_endpoint }}/hah-snapshots
+acl = private
+{{ end }}
+        EOH
+        destination = "/local/rclone.conf"
+
+      }
+      template {
+        data        = <<-EOH
 CONSUL_HTTP_TOKEN="{{ with secret "hashi_at_home/creds/cluster-role" }}{{ .Data.token }}{{ end }}"
 CONSUL_HTTP_ADDR=http://localhost:8500
-GITHUB_TOKEN="{{ with secret "github/token" "repositories=personal-automation"
-"installation_id=17687806"}}{{ .Data.token }}{{ end }}"
 NOMAD_ADDR={{ with service "http.nomad" }}{{ with index . 0 }}http://{{ .Address }}:{{ .Port }}{{ end }}{{ end }}
 NOMAD_TOKEN="{{ with secret "nomad/creds/mgmt" }}{{ .Data.secret_id }}{{ end }}"
 VAULT_ADDR={{ range service "vault" }}http://{{ .Address }}:{{ .Port }}{{- end }}
