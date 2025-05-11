@@ -12,7 +12,7 @@ job "journalctl-gc" {
 
 
   group "garbage-collection" {
-    task "garbage-collection" {
+    task "journalctl" {
       resources {
         memory = 64
         cpu    = 100
@@ -22,6 +22,17 @@ job "journalctl-gc" {
       config {
         command = "journalctl"
         args    = ["--vacuum-time", "7d"]
+      }
+    }
+    task "docker" {
+      resources {
+        memory = 64
+        cpu    = 100
+      }
+      driver = "raw_exec"
+      config {
+        command = "docker"
+        args    = ["system", "prune", "--volumes", "--force"]
       }
     }
   }
