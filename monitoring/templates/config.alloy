@@ -1,0 +1,45 @@
+prometheus.exporter.unix "local_system" {
+  disable_collectors = ["ipvs", "btrfs", "infiniband", "xfs", "zfs"]
+  enable_collectors = ["meminfo"]
+
+  filesystem {
+    fs_types_exclude     = "^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|tmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs)$"
+    mount_points_exclude = "^/(dev|proc|run/credentials/.+|sys|var/lib/docker/.+)($|/)"
+    mount_timeout        = "5s"
+  }
+
+  netclass {
+    ignored_devices = "^(veth.*|cali.*|[a-f0-9]{15})$"
+  }
+
+  netdev {
+    device_exclude = "^(veth.*|cali.*|[a-f0-9]{15})$"
+  }
+}
+
+prometheus.scrape "scrape_metrics" {
+  targets = prometheus.exporter.unix.local_system.targets
+  forward_to = [prometheus.relabel.filter_metrics.receiver]
+  scrape_interval = "10s"
+}
+
+prometheus.relabel "filter_metrics" {
+rule {
+  action = "drop"
+  source_labels = ["env"]
+  regex = "dev"
+}
+  forward_to = [prometheus.remote_write.metrics_service.receiver]
+}
+
+{{ with secret "hashiatho.me-v2/data/grafana_cloud" }}
+prometheus.remote_write "metrics_service" {
+  endpoint {
+    url = "{{ .Data.data.metrics_url }}"
+    basic_auth {
+      username = "{{ .Data.data.metrics_id }}"
+      password = "{{ .Data.data.api_key }}"
+    }
+  }
+}
+{{ end }}
