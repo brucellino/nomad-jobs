@@ -10,7 +10,7 @@ terraform {
     }
     digitalocean = {
       source  = "digitalocean/digitalocean"
-      version = "2.54.0"
+      version = "2.55.0"
     }
     nomad = {
       source  = "hashicorp/nomad"
