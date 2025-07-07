@@ -84,6 +84,7 @@ POSTGRES_PASSWORD="{{ .Data.data.postgres_pass }}"
       driver = "docker"
       config {
         image = "${var.db.image}:${var.db.version}"
+        ports = ["db"]
       }
       resources {
         cpu    = 500
@@ -100,6 +101,38 @@ POSTGRES_PASSWORD="{{ .Data.data.postgres_pass }}"
           interval = "20s"
           timeout  = "5s"
         }
+      }
+    }
+
+    task "migrations" {
+      driver = "docker"
+      vault {
+        policies      = ["nomad-read"]
+        change_mode   = "signal"
+        change_signal = "SIGHUP"
+      }
+      resources {
+        cpu    = 256
+        memory = 128
+      }
+      template {
+        data        = <<EOF
+{{ with secret "hashiatho.me-v2/data/report_portal" }}
+POSTGRES_USER="{{ .Data.data.postgres_user }}"
+POSTGRES_PASSWORD="{{ .Data.data.postgres_pass }}"
+{{ end }}
+POSTGRES_SERVER="{{ env "NOMAD_IP_db" }}"
+POSTGRES_PORT="{{ env "NOMAD_HOST_PORT_db" }}"
+POSTGRES_DB="${var.db.db_name}"
+        EOF
+        destination = "${NOMAD_SECRETS_DIR}/task.env"
+        env         = true
+      }
+      config {
+        image = "reportportal/migrations:5.14.0"
+      }
+      lifecycle {
+        hook = "poststart"
       }
     }
 
@@ -161,4 +194,5 @@ RABBITMQ_PLUGINS="rabbitmq_consistent_hash_exchange rabbitmq_management rabbitmq
       }
     }
   }
+
 }
