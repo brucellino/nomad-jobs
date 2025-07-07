@@ -60,6 +60,9 @@ job "report-portal" {
       port "opensearch" {
         to = var.opensearch.port
       }
+      port "index" {
+        to = "8080"
+      }
     }
 
     task "db" {
@@ -137,6 +140,16 @@ POSTGRES_DB="${var.db.db_name}"
     }
 
     task "opensearch" {
+      service {
+        port = "opensearch"
+        check {
+          name     = "opensearch"
+          type     = "http"
+          path     = "/_cat/health"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
       env = {
         "discovery.type"              = "single-node"
         "plugins.security.disabled"   = true
@@ -150,6 +163,7 @@ POSTGRES_DB="${var.db.db_name}"
         ulimit {
           memlock = "-1:-1"
         }
+        ports = ["opensearch"]
       }
       resources {
         cores  = 1
@@ -160,6 +174,39 @@ POSTGRES_DB="${var.db.db_name}"
       constraint {
         attribute = "${attr.unique.hostname}"
         value     = "ticklish"
+      }
+    }
+
+    task "index" {
+      service {
+        tags = [
+          "traefik.http.routers.index.rule=PathPrefix(`/`)",
+          "traefik.http.routers.index.service=index",
+          "traefik.http.services.index.loadbalancer.server.port=8080",
+          "traefik.http.services.index.loadbalancer.server.scheme=http",
+          "traefik.expose=true"
+        ]
+        port = "index"
+
+        check {
+          name     = "index"
+          type     = "http"
+          path     = "/health"
+          interval = "10s"
+          timeout  = "2s"
+        }
+      }
+      # template {
+
+      # }
+      env {
+        LB_URL          = "http://gateway:8081"
+        TRAEFIK_V2_MODE = true
+      }
+      driver = "docker"
+      config {
+        image = "reportportal/service-index:5.14.0"
+        ports = ["index"]
       }
     }
   }
