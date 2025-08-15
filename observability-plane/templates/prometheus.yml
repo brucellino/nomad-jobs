@@ -1,0 +1,134 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: "nomad-cluster"
+    environment: "production"
+
+rule_files:
+  - "/local/alerts/*.yml"
+
+scrape_configs:
+  # Prometheus self-monitoring
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # Nomad metrics via Consul service discovery
+  - job_name: "nomad-metrics"
+    consul_sd_configs:
+      - server: "localhost:8500"
+        services: ["nomad", "nomad-client"]
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: ".*,http,.*"
+        action: keep
+      - source_labels: [__address__]
+        regex: "([^:]+):(.*)"
+        target_label: __address__
+        replacement: "${1}:4646"
+    metrics_path: "/v1/metrics"
+    params:
+      format: ["prometheus"]
+    scrape_interval: 15s
+
+  # Consul metrics
+  - job_name: "consul-metrics"
+    consul_sd_configs:
+      - server: "localhost:8500"
+        services: ["consul"]
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: ".*,http,.*"
+        action: keep
+      - source_labels: [__address__]
+        regex: "([^:]+):(.*)"
+        target_label: __address__
+        replacement: "${1}:8500"
+    metrics_path: "/v1/agent/metrics"
+    params:
+      format: ["prometheus"]
+    scrape_interval: 15s
+
+  # Node Exporter via Consul service discovery
+  - job_name: "node-exporter"
+    consul_sd_configs:
+      - server: "localhost:8500"
+        services: ["node-exporter"]
+    relabel_configs:
+      - source_labels: [__meta_consul_service_address]
+        target_label: __address__
+        replacement: "${1}:{{ .Port }}"
+
+  # Vault metrics (if available)
+  - job_name: "vault-metrics"
+    consul_sd_configs:
+      - server: "localhost:8500"
+        services: ["vault"]
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: ".*,active,.*"
+        action: keep
+      - source_labels: [__address__]
+        regex: "([^:]+):(.*)"
+        target_label: __address__
+        replacement: "${1}:8200"
+    metrics_path: "/v1/sys/metrics"
+    params:
+      format: ["prometheus"]
+    scrape_interval: 15s
+    scheme: https
+    tls_config:
+      insecure_skip_verify: true
+
+  # Loki metrics
+  - job_name: "loki"
+    consul_sd_configs:
+      - server: "localhost:8500"
+        services: ["loki"]
+    relabel_configs:
+      - source_labels: [__meta_consul_service_address]
+        target_label: __address__
+        replacement: "${1}:{{ .Port }}"
+    metrics_path: "/metrics"
+    scrape_interval: 15s
+
+  # Any services with 'prometheus' tag for auto-discovery
+  - job_name: "consul-services"
+    consul_sd_configs:
+      - server: "localhost:8500"
+    relabel_configs:
+      - source_labels: [__meta_consul_tags]
+        regex: ".*,prometheus,.*"
+        action: keep
+      - source_labels: [__meta_consul_service]
+        target_label: job
+      - source_labels: [__meta_consul_service_address]
+        target_label: __address__
+        replacement: "${1}:{{ .Port }}"
+    metrics_path: "/metrics"
+    scrape_interval: 30s
+# Remote write configuration for Mimir
+remote_write:
+  - url: http://mimir.service.consul:8080/api/v1/push
+    queue_config:
+      max_samples_per_send: 1000
+      max_shards: 200
+      capacity: 2500
+      batch_send_deadline: 5s
+      min_backoff: 30ms
+      max_backoff: 100ms
+    metadata_config:
+      send: true
+      send_interval: 30s
+    write_relabel_configs:
+      - source_labels: [__name__]
+        regex: "(prometheus_build_info|prometheus_config_last_reload_.*)"
+        action: drop
+
+# Remote read configuration for querying historical data from Mimir
+remote_read:
+  - url: http://mimir.service.consul:8080/prometheus/api/v1/read
+    read_recent: true
+    required_matchers:
+      job: ".*"
