@@ -14,7 +14,7 @@ terraform {
     }
     nomad = {
       source  = "hashicorp/nomad"
-      version = "2.5.1"
+      version = "2.5.2"
     }
     consul = {
       source  = "hashicorp/consul"
