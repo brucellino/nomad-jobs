@@ -1,5 +1,6 @@
 job "kroki" {
   group "gateway" {
+    count = 1
     network {
       port "http" {
         to = 8000
@@ -7,7 +8,14 @@ job "kroki" {
     }
     task "kroki" {
       service {
+        name = "kroki"
         port = "http"
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.kroki.rule=Path(`/kroki`)",
+          "traefik.http.routers.kroki.middlewares=kroki-strip",
+          "traefik.http.middlewares.kroki-strip.stripprefix.prefixes=/kroki"
+        ]
         check {
           type     = "http"
           name     = "kroki_health"
@@ -19,7 +27,7 @@ job "kroki" {
       }
       driver = "docker"
       config {
-        image = "yuzutech/kroki"
+        image = "yuzutech/kroki:0.30.0"
         ports = ["http"]
       }
     }
