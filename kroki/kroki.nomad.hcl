@@ -12,9 +12,10 @@ job "kroki" {
         port = "http"
         tags = [
           "traefik.enable=true",
-          "traefik.http.routers.kroki.rule=Path(`/kroki`)",
-          "traefik.http.routers.kroki.middlewares=kroki-strip",
-          "traefik.http.middlewares.kroki-strip.stripprefix.prefixes=/kroki"
+          "traefik.http.routers.kroki.rule=PathPrefix(`/kroki`)",
+          "traefik.http.routers.kroki.middlewares=kroki-rewrite",
+          "traefik.http.middlewares.kroki-rewrite.replacepathregex.regex=^/kroki(.*)",
+          "traefik.http.middlewares.kroki-rewrite.replacepathregex.replacement=$1"
         ]
         check {
           type     = "http"
