@@ -1,15 +1,160 @@
+variable "platform_postgres_service" {
+  type    = string
+  default = "platform-data-plane-default"
+}
+
 job "keycloak" {
+  constraint {
+    attribute = "${meta.model}"
+    operator  = "="
+    value     = "Raspberry Pi 5 Model B Rev 1.1"
+  }
   datacenters = ["dc1"]
   type        = "service"
   vault {}
 
   group "keycloak" {
+
     network {
+      dns {
+        servers = ["172.17.0.1"]
+      }
+      # mode = "bridge"
       port "ui" {
         static = 8080
       }
       port "mgmt" {
         to = 9000
+      }
+    } // group network
+
+    task "db-init" {
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+      consul {}
+      driver = "docker"
+      config {
+        image   = "postgres:17.9-alpine"
+        command = "psql"
+        args = [
+          "-h", "${DB_ADDR}",
+          "-U", "${DB_USER}",
+          "-p", "${DB_PORT}",
+          "-f", "local/init-user.sql",
+          "-f", "local/init-db.sql"
+        ]
+        # dns_servers = ["127.0.0.1", "${attr.unique.network.ip-address}", "1.1.1.1"]
+      } // prestart task config
+
+      template {
+        destination = "local/init-user.sql"
+        data        = <<EOT
+      {{ with secret "hashiatho.me-v2/data_plane" }}
+      -- Create keycloak user if it doesn't exist
+      DO $$
+      BEGIN
+        CREATE USER {{ .Data.data.db_username }} WITH PASSWORD '{{ .Data.data.db_password }}';
+      EXCEPTION WHEN DUPLICATE_OBJECT THEN
+        NULL;
+      END
+      $$;
+      {{ end }}
+      EOT
+        perms       = "0644"
+      }
+
+      template {
+        destination = "local/init-db.sql"
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/keycloak" }}
+-- Create keycloak database if it doesn't exist
+CREATE DATABASE keycloak OWNER keycloak;
+
+-- Connect to keycloak database
+\c keycloak
+
+-- Create schema if it doesn't exist
+CREATE SCHEMA IF NOT EXISTS keycloak;
+
+-- Grant permissions on database
+GRANT CONNECT ON DATABASE keycloak TO keycloak;
+
+-- Grant permissions on schemas
+GRANT USAGE ON SCHEMA public TO keycloak;
+GRANT USAGE ON SCHEMA keycloak TO keycloak;
+GRANT CREATE ON SCHEMA public TO keycloak;
+GRANT CREATE ON SCHEMA keycloak TO keycloak;
+
+-- Grant permissions on existing tables
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO keycloak;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA keycloak TO keycloak;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO keycloak;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA keycloak TO keycloak;
+
+-- Set default privileges for future tables
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO keycloak;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO keycloak;
+ALTER DEFAULT PRIVILEGES IN SCHEMA keycloak GRANT ALL ON TABLES TO keycloak;
+ALTER DEFAULT PRIVILEGES IN SCHEMA keycloak GRANT ALL ON SEQUENCES TO keycloak;
+{{ end }}
+EOT
+        perms       = "0644"
+      } // db init template
+
+      template {
+        data        = <<EOH
+{{ range service "primary.${var.platform_postgres_service}" }}
+DB_ADDR="{{ .Address }}"
+DB_PORT="{{ .Port }}"
+{{ end }}
+{{ with secret "hashiatho.me-v2/data_plane" }}
+DB_PASSWORD="{{ .Data.data.postgres_root_password }}"
+PGPASSWORD="{{ .Data.data.postgres_root_password }}"
+DB_USER="{{ .Data.data.postgres_root_user }}"
+{{ end }}
+          EOH
+        destination = "secrets/db.env"
+        env         = true
+        # wait {
+        #     min = "2s"
+        #     max = "10s"
+        # }
+      } // secrets template
+    }   // task
+
+    task "migration" {
+      consul {}
+      lifecycle {
+        hook    = "prestart"
+        sidecar = false
+      }
+      driver = "exec"
+      template {
+        destination = "local/configure-db.sh"
+        perms       = "0700"
+        data        = <<EOT
+#!/bin/bash -eot
+echo "Migrating Realm"
+exit 0
+        EOT
+      }
+      // Remote bucket credentials
+      template {
+        data        = <<EOH
+  {{ with secret "hashiatho.me-v2/data/cloudflare" }}
+  AWS_ACCESS_KEY_ID = "{{ .Data.data.platform_state_bucket_access_key_id }}"
+  AWS_SECRET_ACCESS_KEY = "{{ .Data.data.platform_state_bucket_secret_access_key }}"
+  BUCKET_NAME = "{{ .Data.data.platform_state_bucket }}"
+  {{ end }}
+  EOH
+        destination = "secrets/r2.env"
+        env         = true
+      }
+      config {
+        command = "/bin/bash"
+        args    = ["local/configure-db.sh"]
       }
     }
 
@@ -18,6 +163,7 @@ job "keycloak" {
       service {
         name = "platform-keycloak"
         port = "mgmt"
+        tags = [""]
         check {
           name     = "keycloak-started"
           type     = "http"
@@ -42,7 +188,7 @@ job "keycloak" {
       }
       template {
         data        = <<EOF
-{{ range service "master.default" }}
+{{ range service "primary.${var.platform_postgres_service}" }}
 KC_DB_URL="jdbc:postgresql://{{ .Address }}:{{ .Port }}/keycloak"
 {{ end }}
 {{ with secret "hashiatho.me-v2/data/keycloak" }}
@@ -81,7 +227,7 @@ EOF
 echo ${KC_BOOTSTRAP_ADMIN_USERNAME}
 env
 /opt/keycloak/bin/kc.sh build
-/opt/keycloak/bin/kc.sh bootstrap-admin user --username admain --password:env KC_BOOTSTRAP_ADMIN_PASSWORD
+/opt/keycloak/bin/kc.sh bootstrap-admin user --username admin --password:env KC_BOOTSTRAP_ADMIN_PASSWORD
 /opt/keycloak/bin/kc.sh start --optimized
         EOT
       }
@@ -90,6 +236,6 @@ env
         entrypoint = ["local/start.sh"]
         ports      = ["ui", "mgmt"]
       }
-    }
-  }
-}
+    } // task
+  }   // group
+}     // job
