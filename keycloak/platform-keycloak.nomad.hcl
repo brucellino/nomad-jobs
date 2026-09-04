@@ -105,7 +105,7 @@ EOT
 
       template {
         data        = <<EOH
-{{ range service "primary.${var.platform_postgres_service}" }}
+{{ range service "primary.platform-data-plane-default" }}
 DB_ADDR="{{ .Address }}"
 DB_PORT="{{ .Port }}"
 {{ end }}
@@ -130,20 +130,26 @@ DB_USER="{{ .Data.data.postgres_root_user }}"
         hook    = "prestart"
         sidecar = false
       }
-      driver = "exec"
+      driver = "docker"
       template {
-        destination = "local/configure-db.sh"
-        perms       = "0700"
+        destination = "local/rclone.conf"
+        perms       = "0644"
         data        = <<EOT
-#!/bin/bash -eot
-echo "Migrating Realm"
-exit 0
+{{ with secret "hashiatho.me-v2/cloudflare" }}
+[r2]
+type = s3
+provider = Cloudflare
+access_key_id = {{ .Data.data.platform_state_bucket_access_key_id }}
+secret_access_key = {{ .Data.data.platform_state_bucket_secret_access_key }}
+endpoint = {{ .Data.data.platform_access_bucket_endpoint }}
+acl = private
+{{ end }}
         EOT
       }
       // Remote bucket credentials
       template {
         data        = <<EOH
-  {{ with secret "hashiatho.me-v2/data/cloudflare" }}
+  {{ with secret "hashiatho.me-v2/cloudflare" }}
   AWS_ACCESS_KEY_ID = "{{ .Data.data.platform_state_bucket_access_key_id }}"
   AWS_SECRET_ACCESS_KEY = "{{ .Data.data.platform_state_bucket_secret_access_key }}"
   BUCKET_NAME = "{{ .Data.data.platform_state_bucket }}"
@@ -153,8 +159,8 @@ exit 0
         env         = true
       }
       config {
-        command = "/bin/bash"
-        args    = ["local/configure-db.sh"]
+        image = "rclone/rclone:latest"
+        args  = ["--config", "/local/rclone.conf", "tree", "r2:${BUCKET_NAME}"]
       }
     }
 
@@ -228,6 +234,11 @@ echo ${KC_BOOTSTRAP_ADMIN_USERNAME}
 env
 /opt/keycloak/bin/kc.sh build
 /opt/keycloak/bin/kc.sh bootstrap-admin user --username admin --password:env KC_BOOTSTRAP_ADMIN_PASSWORD
+# Create adamin user
+# Create client for Terraform
+{{ with secret "hashiatho.me-v2/keycloak" }}
+# $ kcadm.sh create clients -r master -s clientId=terraform -s enabled=true -s clientAuthenticatorType=client-secret -s secret={{ .Data.data.terraform_client_id }}
+{{ end }}
 /opt/keycloak/bin/kc.sh start --optimized
         EOT
       }
