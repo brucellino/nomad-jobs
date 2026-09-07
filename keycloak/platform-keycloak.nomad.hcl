@@ -15,6 +15,12 @@ job "keycloak" {
 
   group "keycloak" {
 
+    restart {
+      interval         = "5m"
+      delay            = "30s"
+      render_templates = true
+    }
+
     network {
       dns {
         servers = ["172.17.0.1"]
@@ -27,6 +33,8 @@ job "keycloak" {
         to = 9000
       }
     } // group network
+
+
 
     task "db-init" {
       lifecycle {
@@ -51,7 +59,7 @@ job "keycloak" {
       template {
         destination = "local/init-user.sql"
         data        = <<EOT
-      {{ with secret "hashiatho.me-v2/data_plane" }}
+      {{ with secret "hashiatho.me-v2/keycloak" }}
       -- Create keycloak user if it doesn't exist
       DO $$
       BEGIN
