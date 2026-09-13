@@ -1,0 +1,26 @@
+= Indico
+
+This is the docs for the indico deployment.
+
+https://getindico.io[Indico] is an events management system.
+We use it to manage events.
+
+It is documented at https://docs.getindico.io/[Indico Docs].
+See https://github.com/indico/indico-contianers[Indico containers] repo for reference.
+
+== Application architecture
+
+Indico is a python flask application served by uwsgi.
+
+It is backed by
+
+* a database
+* a redis cache
+* a celery task queue
+
+Other assumptions include:
+
+* Nginx frontend
+
+
+== Dev setup
