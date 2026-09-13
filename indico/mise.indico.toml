@@ -1,0 +1,87 @@
+[oci]
+# currently failing with
+#   apt-get failed while installing OCI system packages: exit status: 100
+# debconf: DbDriver "passwords" warning: could not open /var/cache/debconf/passwords.dat: Permission denied
+# touch: cannot touch '/var/lib/update-notifier/dpkg-run-stamp': Permission denied
+from = "ubuntu:24.04"
+tag         = "ghcr.io/hashiatho.me/indico:v1"  # default tag for the built image
+workdir     = "/workspace"             # WORKDIR
+entrypoint  = []           # ENTRYPOINT
+cmd         = []                        # CMD
+user        = "1000:1000"                # USER
+user_id     = 1000                     # tar layer entry UID (file ownership)
+group_id    = 1000                      # tar layer entry GID (defaults to user_id)
+mount_point = "/mise"
+
+[bootstrap.packages]
+"apt:libpq-dev" = "16.15-0ubuntu0.24.04.1"
+# "apt:libxslt1-dev" = "latest"
+# "apt:libxml2-dev" = "latest"
+# "apt:libffi-dev" = "latest"
+# "apt:libpcre2-dev" = "latest"
+# "apt:libyaml-dev" = "latest"
+# "apt:libssl-dev" = "latest"
+# "apt:zlib1g-dev" = "latest"
+# "apt:libbz2-dev" = "latest"
+# "apt:libreadline-dev" = "latest"
+# "apt:libsqlite3-dev" = "latest"
+# "apt:libncurses5-dev" = "latest"
+# "apt:libncursesw5-dev" = "latest"
+# "apt:xz-utils" = "latest"
+# "apt:liblzma-dev" = "latest"
+# "apt:uuid-dev" = "latest"
+# "apt:build-essential" = "latest"
+"apt:gcc" = "latest"
+"apt:git" = "latest"
+# "apt:libpango1.0-dev" = "latest"
+
+
+# User and groups are taken from indico-containers repo
+# https://github.com/indico/indico-containers/blob/master/indico-prod/worker/Dockerfile
+[bootstrap.groups.indico]
+system = false
+gid = 999
+
+[bootstrap.users.indico]
+system = false
+uid = 999
+group = "indico"
+groups = ["indico"]
+home = "/opt/indico"
+
+[bootstrap.directories."/indico"]
+owner = "indico"
+group = "indico"
+mode = "0755"
+
+[bootstrap.repos]
+"/opt/indico" = {
+  url = "https://github.com/indico/indico",
+  ref = "v3.3.13"
+}
+
+[tools]
+python = { version = "3.12" }
+uv = "0.12.13"
+
+[env]
+# Automatic virtualenv activation
+_.python.venv = {
+    path = "/opt/indico/.venv",
+    create = true,
+    uv_create_args = ["--seed"]
+}
+
+[settings]
+python.uv_venv_auto = "create|source"
+
+[tasks.uwsgi]
+description = "Install uwsgi server"
+alias = "uwsgi"
+run = "uv pip install uwsgi"
+
+[tasks.install]
+depends = ['uwsgi']
+description = "Install dependencies"
+alias = "i"
+run = "uv pip install -r requirements.txt"
