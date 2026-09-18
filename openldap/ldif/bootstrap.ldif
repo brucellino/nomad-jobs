@@ -1,0 +1,34 @@
+# Groups OU
+dn: ou=Groups,dc=example,dc=org
+objectclass: organizationalUnit
+objectclass: top
+ou: Groups
+
+# Users OU
+dn: ou=Users,dc=example,dc=org
+objectclass: organizationalUnit
+objectclass: top
+ou: Users
+
+# platform-owners group
+dn: cn=platform-owners,ou=Groups,dc=example,dc=org
+cn: platform-owners
+gidnumber: 500
+memberuid: bruce
+objectclass: posixGroup
+objectclass: top
+
+# Bruce user
+dn: uid=bruce,ou=Users,dc=example,dc=org
+uid: bruce
+cn: Bruce
+sn: Bruce
+givenname: Bruce
+mail: bruce@example.org
+objectclass: inetOrgPerson
+objectclass: posixAccount
+objectclass: top
+uidnumber: 1000
+gidnumber: 500
+homedirectory: /home/users/bruce
+userpassword: password
