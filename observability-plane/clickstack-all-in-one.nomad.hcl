@@ -1,10 +1,5 @@
-job "clickstack-all-in-one" {
-  group "clickhouse" {
-    constraint {
-      attribute = "${attr.unique.hostname}"
-      operator  = "regexp"
-      value     = "ticklish|cape"
-    }
+job "clickstack-ao1" {
+  group "ai1" {
     network {
       port "http" {
         to = 8080
@@ -17,11 +12,11 @@ job "clickstack-all-in-one" {
       }
     }
     task "clickstack" {
-      driver = "docker"
       resources {
         cpu    = 1024
         memory = 2048
       }
+      driver = "docker"
       config {
         image = "clickhouse/clickstack-all-in-one:latest"
         ports = ["http", "otlp-http", "otlp-grpc"]
