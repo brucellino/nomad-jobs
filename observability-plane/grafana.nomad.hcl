@@ -19,9 +19,9 @@ job "grafana" {
 
   update {
     max_parallel      = 1
-    min_healthy_time  = "20s"
-    healthy_deadline  = "5m"
-    progress_deadline = "10m"
+    min_healthy_time  = "5s"
+    healthy_deadline  = "15m"
+    progress_deadline = "30m"
     auto_revert       = true
     auto_promote      = true
     canary            = 1
@@ -30,8 +30,8 @@ job "grafana" {
   migrate {
     max_parallel     = 1
     health_check     = "checks"
-    min_healthy_time = "15s"
-    healthy_deadline = "5m"
+    min_healthy_time = "5s"
+    healthy_deadline = "30m"
   }
 
   group "back" {
@@ -138,12 +138,12 @@ while ! nc -z {{ .Address }} {{ .Port }} ; do sleep 1 ; done
       service {
         tags = [
           "traefik.enable=true",
-          "traefik.http.routers.grafana.rule=Path(`/grafana`)",
-          "traefik.http.routers.grafana.service=grafana-front-grafana",
           "traefik.http.routers.grafana.entrypoints=http",
-          "monitoring",
-          "dashboard",
-          "urlprefix-/grafana:3000",
+          "traefik.http.middlewares.grafana-stripprefix.stripprefix.prefixes=grafana",
+          "traefik.http.routers.grafana.rule=PathPrefix(`/grafana`)",
+          "traefik.http.routers.grafana.middlewares=grafana-stripprefix",
+          "traefik.http.routers.grafana.observability.metrics=true",
+          "traefik.http.routers.grafana.service=grafana-front-grafana"
         ]
         port = "grafana_srv"
 
@@ -152,8 +152,8 @@ while ! nc -z {{ .Address }} {{ .Port }} ; do sleep 1 ; done
           name     = "grafana-api"
           path     = "/api/health"
           type     = "http"
-          interval = "10m"
-          timeout  = "10s"
+          interval = "5s"
+          timeout  = "1s"
         }
       }
       driver = "docker"

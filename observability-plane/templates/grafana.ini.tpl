@@ -4,7 +4,9 @@ enabled = true
 
 [server]
 protocol = http
-http_port = ${NOMAD_HOST_PORT_grafana_server}
+http_port = 3000
+serve_from_sub_path = true
+root_url = http://traefik.service.consul:8080/grafana
 # cert_file = none
 # cert_key = none
 
@@ -41,5 +43,8 @@ disable_gravatar = true
 
 [dashboards]
 versions_to_keep = 10
+
+[unified_alerting]
+allowed_integrations = "prometheus-alertmanager,email,jira, mqtt,slack,webhook"
 
 {{ end }}
