@@ -1,38 +1,33 @@
 job "clickstack-ao1" {
   group "ai1" {
     network {
-      port "http" {
+      port "ui" {
         to = 8080
       }
-      port "otlp-http" {
-        to = 4318
-      }
-      port "otlp-grpc" {
+      port "otlp_grpc" {
         to = 4317
       }
+      port "otlp_http" {
+        to = 4318
+      }
+      port "clickhouse" {
+        to = 8123
+      }
     }
+
     task "clickstack" {
       resources {
-        cpu    = 1024
-        memory = 2048
+        cores  = 4
+        memory = 4096
       }
       driver = "docker"
       config {
         image = "clickhouse/clickstack-all-in-one:latest"
-        ports = ["http", "otlp-http", "otlp-grpc"]
+        ports = ["ui", "otlp_grpc", "otlp_http", "clickhouse"]
       }
       env {
-        HYPERDX_APP_URL = "http://${NOMAD_IP_http}"
-      }
-
-      service {
-        name = "otelexporter"
-        port = "otlp-http"
-        check {
-          type     = "tcp"
-          interval = "30s"
-          timeout  = "10s"
-        }
+        # HYPERDX_API_PORT = 8000
+        HYPERDX_APP_URL = "http://${NOMAD_IP_ui}"
       }
     }
   }
