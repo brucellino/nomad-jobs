@@ -110,7 +110,8 @@ scrape_configs:
     scrape_interval: 30s
 # Remote write configuration for Mimir
 remote_write:
-  - url: http://mimir.service.consul:8080/api/v1/push
+{{ with service "metrics-srv-mimir" }}
+  - url: http://{{ .Address }}:{{ .Port }}/api/v1/push
     queue_config:
       max_samples_per_send: 1000
       max_shards: 200
@@ -128,7 +129,8 @@ remote_write:
 
 # Remote read configuration for querying historical data from Mimir
 remote_read:
-  - url: http://mimir.service.consul:8080/prometheus/api/v1/read
+  - url: http://{{ .Address }}:{{ .Port }}/prometheus/api/v1/read
     read_recent: true
     required_matchers:
       job: ".*"
+{{ end }}
