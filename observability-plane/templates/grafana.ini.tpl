@@ -1,4 +1,4 @@
-{{ with secret "hashiatho.me-v2/grafana" }}
+{{ with secret "hashiatho.me-v2/observability" }}
 [auth.anonymous]
 enabled = true
 
@@ -9,12 +9,15 @@ http_port = ${NOMAD_HOST_PORT_grafana_server}
 # cert_key = none
 
 [database]
-type = mysql
-{% comment %} host = mysql.service.consul:3306 {% endcomment %}
-{{- range service "mysql" }}host = {{ .Address }}:{{ .Port }}{{- end }}
-user = root
-password = """{{ .Data.data.root_password }}"""
+type = postgres
+{{- range service "grafana-back-postgres" }}
+host = {{ .Address }}:{{ .Port }}
+{{- end }}
+user = {{ .Data.data.postgres_root_user }}
+password = """{{ .Data.data.postgres_root_password }}"""
 ssl_mode = disable
+log_queries = true
+instrument_queries = true
 # ca_cert_path = none
 # client_key_path = none
 # client_cert_path = none
@@ -39,9 +42,4 @@ disable_gravatar = true
 [dashboards]
 versions_to_keep = 10
 
-[alerting]
-enabled = true
-
-[unified_alerting]
-enabled = true
 {{ end }}
