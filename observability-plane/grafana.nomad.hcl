@@ -136,7 +136,15 @@ while ! nc -z {{ .Address }} {{ .Port }} ; do sleep 1 ; done
     task "grafana" {
       shutdown_delay = "60s"
       service {
-        tags = ["monitoring", "dashboard", "urlprefix-/grafana:3000"]
+        tags = [
+          "traefik.enable=true",
+          "traefik.http.routers.grafana.rule=Path(`/grafana`)",
+          "traefik.http.routers.grafana.service=grafana-front-grafana",
+          "traefik.http.routers.grafana.entrypoints=http",
+          "monitoring",
+          "dashboard",
+          "urlprefix-/grafana:3000",
+        ]
         port = "grafana_srv"
 
         check {
