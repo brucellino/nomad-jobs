@@ -61,7 +61,7 @@ mode = "0755"
 }
 
 [tools]
-python = { version = "3.12" }
+python = { version = "3.14.8" }
 uv = "0.12.13"
 
 [env]
