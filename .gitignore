@@ -2,3 +2,4 @@
 *.vars
 *.tfvars
 .terraform/
+.infracost/
