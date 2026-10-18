@@ -3,13 +3,27 @@ job "immich" {
 
     # Constraints
     # Affinity
-    # Prefer nodes with little ram
+
     affinity {
+      # Prefer nodes with little ram
       attribute = "${attr.memory.totalbytes}"
       value     = "1000000000" # 1GB
       operator  = "<"
       weight    = 90
     }
+
+    # spread
+
+    count = 1
+
+    consul {}
+
+    ephemeral_disk {
+      migrate = true
+      size    = 2048
+      sticky  = true
+    }
+
     network {
       port "redis" {
         to = 6379
