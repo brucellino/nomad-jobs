@@ -1,5 +1,15 @@
 job "immich" {
-
+  ui {
+    description = "Immich is a photo sharing app."
+    link {
+      label = "Documentation"
+      url   = "https://docs.immich.app/"
+    }
+    link {
+      label = "Website"
+      url   = "https://immich.app/"
+    }
+  }
   reschedule {
     # always reschedule the job
     interval       = "20m"
@@ -22,11 +32,8 @@ job "immich" {
   }
 
   group "backing" {
-
-
     # Constraints
     # Affinity
-
     affinity {
       # Prefer nodes with little ram
       attribute = "${attr.memory.totalbytes}"
@@ -35,7 +42,7 @@ job "immich" {
       weight    = 90
     }
 
-    # spread
+    # Spread
 
     count = 1
 
@@ -80,8 +87,8 @@ job "immich" {
     task "redis" {
       shutdown_delay = "5s"
       resources {
-        cpu    = 128
-        memory = 128
+        cpu    = 128 # MHz
+        memory = 128 # MB
       }
       // script check redis-cli ping | grep -q PONG || exit 1
       driver = "podman"
