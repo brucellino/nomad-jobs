@@ -8,6 +8,14 @@ job "immich" {
     max_delay      = "120s"
     unlimited      = true
   }
+
+  restart {
+    attempts         = 2
+    delay            = "5m"
+    interval         = "10m"
+    render_templates = true
+    mode             = "delay"
+  }
   group "backing" {
 
     # Constraints
