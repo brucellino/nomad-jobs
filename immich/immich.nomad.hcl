@@ -61,10 +61,10 @@ job "immich" {
     }
     # migrate
     migrate {
-      max_parallel = 1
-      # health_check = "checks"
-      # min_healthy_time = "15s"
-      # healthy_deadline = "15m"
+      max_parallel     = 1
+      health_check     = "checks"
+      min_healthy_time = "15s"
+      healthy_deadline = "15m"
     }
 
     network {
@@ -95,6 +95,16 @@ job "immich" {
       config {
         image = "docker.io/valkey/valkey:9"
         ports = ["redis"]
+      }
+      service {
+        port = "redis"
+        check {
+          type     = "script"
+          command  = "redis-cli"
+          args     = ["ping"]
+          interval = "15s"
+          timeout  = "3s"
+        }
       }
     }
     # task "postgres" {
