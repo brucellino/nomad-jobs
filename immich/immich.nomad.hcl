@@ -9,14 +9,8 @@ job "immich" {
     unlimited      = true
   }
 
-  restart {
-    attempts         = 2
-    delay            = "5m"
-    interval         = "10m"
-    render_templates = true
-    mode             = "delay"
-  }
   group "backing" {
+
 
     # Constraints
     # Affinity
@@ -60,10 +54,12 @@ job "immich" {
       }
     }
 
-
-
     restart {
-
+      attempts         = 2
+      delay            = "5m"
+      interval         = "10m"
+      render_templates = true
+      mode             = "delay"
     }
 
     update {
