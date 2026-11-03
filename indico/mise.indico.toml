@@ -62,7 +62,7 @@ mode = "0755"
 
 [tools]
 python = { version = "3.15.2" }
-uv = "0.13.6"
+uv = "0.13.7"
 
 [env]
 # Automatic virtualenv activation
