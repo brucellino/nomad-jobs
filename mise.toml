@@ -6,7 +6,7 @@ terraform = "1.17.1"
 nomad = "2.1.1"
 consul = "2.1.0"
 vault = "2.2.1"
-rclone = "1.75.2"
+rclone = "1.76.0"
 
 # Documentation
 d2 = "0.9.0"
