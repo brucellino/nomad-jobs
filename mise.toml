@@ -2,7 +2,7 @@
 
 [tools]
 # Dev and deploy tools
-terraform = "1.17.1"
+terraform = "1.17.2"
 nomad = "2.1.1"
 consul = "2.1.0"
 vault = "2.2.1"
