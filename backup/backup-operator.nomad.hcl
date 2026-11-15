@@ -4,7 +4,7 @@ variable "version" {
   type    = string
   default = "2.0.3"
 }
-job "backup" {
+job "state-snapshot" {
   ui {
     description = "Nomad state snapshot batch job."
     link {
@@ -51,6 +51,17 @@ job "backup" {
         source      = "https://github.com/hashi-at-home/nomad-backup-operator/releases/download/v${var.version}/nomad-operator-linux-arm64"
         destination = "local/backup"
         mode        = "file"
+      }
+      // Get a nomad token and pass it to the environment
+      template {
+        data        = <<EOT
+{{ with secret "nomad/creds/management" }}
+DATA={{ .Data }}
+NOMAD_TOKEN={{ .Data.secret_id }}
+{{ end }}
+        EOT
+        destination = "nomad.env"
+        env         = true
       }
       driver = "exec"
       config {
