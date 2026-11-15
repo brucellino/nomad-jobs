@@ -1,0 +1,3 @@
+= Backup operators
+
+This section contains jobs for batch jobs which should be registered to ensure that the cluster state is backed up.
