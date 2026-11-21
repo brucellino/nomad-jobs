@@ -58,6 +58,7 @@ job "report-portal-services" {
       }
     }
     task "gateway" {
+      vault {}
       resources {
         cpu    = 100
         memory = 256
@@ -71,7 +72,6 @@ job "report-portal-services" {
           "local/traefik.toml:/etc/traefik/traefik.toml"
         ]
       }
-
       template {
         data        = <<EOF
 accesslog = true
@@ -92,7 +92,9 @@ accesslog = true
   [providers.consulCatalog.endpoint]
     address = "172.17.0.1:8500"
     scheme = "http"
-    token = "a0b472c4-8b94-f044-7dcd-cde614015928"
+{{ with secret "hashi_at_home/creds/report_portal"}}
+    token = "{{ .Data.token }}"
+{{ end }}
 EOF
         destination = "local/traefik.toml"
       }
