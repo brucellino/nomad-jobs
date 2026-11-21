@@ -30,6 +30,7 @@ job "state-snapshot" {
   }
 
   group "nomad" {
+
     ephemeral_disk {
       migrate = false
       size    = 250
@@ -46,6 +47,7 @@ job "state-snapshot" {
         memory = 25
       }
       vault {}
+      identity {}
       // We need the application from the releases in the github repo.
       artifact {
         source      = "https://github.com/hashi-at-home/nomad-backup-operator/releases/download/v${var.version}/nomad-operator-linux-arm64"
@@ -56,14 +58,14 @@ job "state-snapshot" {
       template {
         data        = <<EOT
 {{ with secret "nomad/creds/management" }}
-DATA={{ .Data }}
 NOMAD_TOKEN={{ .Data.secret_id }}
+NOMAD_ADDR=http://nomad.service.consul:4646
 {{ end }}
         EOT
         destination = "nomad.env"
         env         = true
       }
-      driver = "exec"
+      driver = "raw_exec"
       config {
         command = "local/backup"
       }
