@@ -66,6 +66,9 @@ job "report-portal-services" {
       port "rabbit-api" {
         static = 15672
       }
+      port "opensearch" {
+        static = 9200
+      }
     }
     task "gateway" {
       vault {}
@@ -132,6 +135,19 @@ EOF
         image = "postgres:18.6"
         ports = ["report-portal-postgres"]
       }
+      shutdown_delay = "20s"
+      service {
+        port = "report-portal-postgres"
+        name = "report-portal-postgres"
+        check {
+          name     = "report-portal-postgres-healthy"
+          type     = "script"
+          command  = "pg_isready"
+          args     = ["-d", "$POSTGRES_DB", "-U", "$POSTGRES_USER"]
+          interval = "10s"
+          timeout  = "5s"
+        }
+      }
       template {
         change_mode = "noop"
         # Secrets for the postgres database
@@ -180,111 +196,48 @@ RABBITMQ_DEFAULT_PASS="{{ .Data.data.rabbit_pass }}"
       }
     }
 
+    task "opensearch" {
+      vault {}
+      resources {
+        cpu    = 2000
+        memory = 1600
+      }
+      driver = "docker"
+      config {
+        image = "opensearchproject/opensearch:3.9.0"
+        ports = ["opensearch"]
+      }
+      template {
+        data        = <<EOT
+discovery.type=single-node
+plugins.security.disabled="true"
+bootstrap.memory_lock="true"
+OPENSEARCH_JAVA_OPTS="-Xms512m -Xmx512m"
+DISABLE_INSTALL_DEMO_CONFIG="true"
+      EOT
+        destination = "local/opensearch.env"
+        env         = true
+      }
+    }
+
   }
 
   #   group "rp-services" {
-  #     count = 1
+  #     network {}
   #
-  #     network {
-  #       port "index" {
-  #         static = 8080
-  #         to     = 8080
-  #       }
-  #       port "ui" {
-  #         static = 8084
-  #         to     = 8080
-  #       }
-  #       port "api" {
-  #         static = 8585
-  #         to     = 8585
-  #       }
-  #       port "uat" {
-  #         static = 9999
-  #         to     = 9999
-  #       }
-  #       port "jobs" {
-  #         static = 8686
-  #         to     = 8686
-  #       }
-  #       port "analyzer" {
-  #         static = 5000
-  #         to     = 5000
-  #       }
-  #       port "analyzer-train" {
-  #         static = 5001
-  #         to     = 5001
-  #       }
-  #     }
-  #
-  #     volume "storage" {
-  #       type      = "host"
-  #       source    = "scratch"
-  #       read_only = false
-  #     }
-  #
-  #     vault {
-  #       policies    = ["nomad-read", "nomad-workloads", "default"]
-  #       change_mode = "noop"
-  #       env         = true
-  #     }
-  #
-  #     restart {
-  #       attempts = 3
-  #       delay    = "30s"
-  #       mode     = "delay"
-  #     }
-  #
-  #     # Database cleanup task - removes plugin conflicts before API starts
-  #     task "db-cleanup" {
+  #     task "migrations" {
+  #       vault {}
   #       driver = "docker"
-  #
-  #       lifecycle {
-  #         hook    = "prestart"
-  #         sidecar = false
-  #       }
-  #
-  #       vault {
-  #         policies    = ["nomad-read"]
-  #         change_mode = "restart"
-  #         # change_signal = "SIGHUP"
-  #       }
-  #
-  #       template {
-  #         data        = <<EOF
-  # {{- range service "rp-db" }}
-  # PGHOST={{ .Address }}
-  # PGPORT={{ .Port }}
-  # {{- end }}
-  # PGDATABASE=${var.db_name}
-  # {{- with secret "hashiatho.me-v2/data/report_portal" }}
-  # PGUSER={{ .Data.data.postgres_user }}
-  # PGPASSWORD={{ .Data.data.postgres_pass }}
-  # {{- end }}
-  # EOF
-  #         destination = "local/db.env"
-  #         env         = true
-  #         change_mode = "restart"
-  #         wait {
-  #           min = "2s"
-  #           max = "60s"
-  #         }
-  #       }
-  #
   #       config {
-  #         image   = "postgres:12.17-alpine"
-  #         command = "sh"
-  #         args = [
-  #           "-c",
-  #           "psql \"postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$PGDATABASE\" -c \"DO \\$\\$ BEGIN IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'integration') THEN TRUNCATE TABLE integration CASCADE; END IF; IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'integration_type') THEN TRUNCATE TABLE integration_type CASCADE; END IF; END \\$\\$;\""
-  #         ]
+  #         image = "reportportal/migrations:6.0.0"
   #       }
-  #
-  #       resources {
-  #         cpu    = 256
-  #         memory = 256
+  #       template {
+  #       data = <<EOT
+  #       EOT
   #       }
   #     }
-  #
+  #   }
+
   #     # Index service - main entry point
   #     task "index" {
   #       driver = "docker"
