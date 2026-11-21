@@ -56,6 +56,9 @@ job "report-portal-services" {
       port "report-portal-ui" {
         static = 8080
       }
+      port "report-portal-postgres" {
+        static = 5432
+      }
     }
     task "gateway" {
       vault {}
@@ -111,12 +114,32 @@ EOF
       }
 
     }
-    # task "postgres" {
-    #   driver = "docker"
-    #   config {
-    #     image = ""
-    #   }
-    # }
+    task "postgres" {
+      vault {}
+      resources {
+        cpu    = 200
+        memory = 512
+      }
+      driver = "docker"
+      config {
+        image = "postgres:18.6"
+        ports = ["report-portal-postgres"]
+      }
+      template {
+        change_mode = "noop"
+        # Secrets for the postgres database
+        # These are read from Vault in hashiatho.me-v2/report_portal
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/report_portal" }}
+POSTGRES_USER="{{ .Data.data.postgres_user }}"
+POSTGRES_PASSWORD="{{ .Data.data.postgres_pass }}"
+POSTGRES_DB="reportportal"
+{{ end }}
+      EOT
+        env         = true
+        destination = "local/postgres.env"
+      }
+    }
 
   }
 
