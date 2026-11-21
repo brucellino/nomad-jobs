@@ -1,10 +1,20 @@
-variable "db_name" {
-  type        = string
-  default     = "reportportal"
-  description = "Database name for Report Portal"
-}
-
+# Monolithic deployment definition for Report Portal
+# Does not depend on anything.
+# Deploys backing services and application services in the same deployment
+# Since the application services depend on the backing services,
+# we should add a few prestart jobs to wait for them to be ready.
 job "report-portal-services" {
+  ui {
+    description = "Report Portal Monolithic Deployment. Deploys all services necessary for a functional Report portal.\n\nSecond line."
+    link {
+      label = "Report Portal"
+      url   = "https://reportportal.io"
+    }
+    link {
+      label = "Report Portal Documentation"
+      url   = "https://reportportal.io/docs"
+    }
+  }
   datacenters = ["dc1"]
   type        = "service"
 
@@ -27,631 +37,728 @@ job "report-portal-services" {
     unlimited      = true
   }
 
-  group "rp-services" {
-    count = 1
-
+  group "backing-services" {
+    # The backing services group contains:
+    # Gateway
+    # ports:
+    # - "8080:8080"  ## ReportPortal UI
+    # - "8081:8081"  ## Traefik dashboard
+    # - "443:443"
+    # postgres Database
+    # ports:
+    #
+    # opensearch
+    # Rabbitmq
     network {
-      mode = "host"
-      port "index" {
+      port "gateway-dashboard" {
+        static = 8081
+      }
+      port "report-portal-ui" {
         static = 8080
-        to     = 8080
       }
-      port "ui" {
-        static = 8084
-        to     = 8080
+      port "report-portal-postgres" {
+        static = 5432
       }
-      port "api" {
-        static = 8585
-        to     = 8585
+      port "rabbitmq" {
+        static = 5672
       }
-      port "uat" {
-        static = 9999
-        to     = 9999
+
+      port "rabbit-api" {
+        static = 15672
       }
-      port "jobs" {
-        static = 8686
-        to     = 8686
-      }
-      port "analyzer" {
-        static = 5000
-        to     = 5000
-      }
-      port "analyzer-train" {
-        static = 5001
-        to     = 5001
+      port "opensearch" {
+        static = 9200
       }
     }
-
-    volume "storage" {
-      type      = "host"
-      source    = "scratch"
-      read_only = false
-    }
-
-    vault {
-      policies    = ["nomad-read", "nomad-workloads", "default"]
-      change_mode = "noop"
-      env         = true
-    }
-
-    restart {
-      attempts = 3
-      delay    = "30s"
-      mode     = "delay"
-    }
-
-    # Database cleanup task - removes plugin conflicts before API starts
-    task "db-cleanup" {
+    task "gateway" {
+      vault {}
+      resources {
+        cpu    = 100
+        memory = 256
+      }
       driver = "docker"
-
-      lifecycle {
-        hook    = "prestart"
-        sidecar = false
+      config {
+        image = "traefik:v3.7.19"
+        args  = ["--configFile=/etc/traefik/traefik.yml"]
+        ports = ["gateway-dashboard", "report-portal-ui"]
+        volumes = [
+          "local/traefik.toml:/etc/traefik/traefik.toml"
+        ]
       }
-
-      vault {
-        policies    = ["nomad-read"]
-        change_mode = "restart"
-        # change_signal = "SIGHUP"
-      }
-
       template {
         data        = <<EOF
-{{- range service "rp-db" }}
-PGHOST={{ .Address }}
-PGPORT={{ .Port }}
-{{- end }}
-PGDATABASE=${var.db_name}
-{{- with secret "hashiatho.me-v2/data/report_portal" }}
-PGUSER={{ .Data.data.postgres_user }}
-PGPASSWORD={{ .Data.data.postgres_pass }}
-{{- end }}
+accesslog = true
+[log]
+  level = "INFO"
+[entryPoints]
+  [entryPoints.http]
+  address = ":8080"
+  [entryPoints.traefik]
+  address = ":8081"
+[api]
+  dashboard = true
+  insecure = true
+# Enable the Consul Catalog configuration backend
+[providers.consulCatalog]
+  prefix = "traefik"
+  exposedByDefault = false
+  [providers.consulCatalog.endpoint]
+    address = "172.17.0.1:8500"
+    scheme = "http"
+{{ with secret "hashi_at_home/creds/report_portal"}}
+    token = "{{ .Data.token }}"
+{{ end }}
 EOF
-        destination = "local/db.env"
-        env         = true
-        change_mode = "restart"
-        wait {
-          min = "2s"
-          max = "60s"
+        destination = "local/traefik.toml"
+      }
+      shutdown_delay = "5s"
+      service {
+        port = "gateway-dashboard"
+        check {
+          type     = "http"
+          name     = "report-portal-gateway-health"
+          path     = "api/http/routers"
+          interval = "10s"
+          timeout  = "2s"
         }
       }
 
-      config {
-        image   = "postgres:12.17-alpine"
-        command = "sh"
-        args = [
-          "-c",
-          "psql \"postgresql://$PGUSER:$PGPASSWORD@$PGHOST:$PGPORT/$PGDATABASE\" -c \"DO \\$\\$ BEGIN IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'integration') THEN TRUNCATE TABLE integration CASCADE; END IF; IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'integration_type') THEN TRUNCATE TABLE integration_type CASCADE; END IF; END \\$\\$;\""
-        ]
-      }
-
-      resources {
-        cpu    = 256
-        memory = 256
-      }
     }
-
-    # Index service - main entry point
-    task "index" {
-      driver = "docker"
-
-      config {
-        image = "reportportal/service-index:5.14.0"
-        ports = ["index"]
-      }
-
-      env {
-        LB_URL          = "http://traefik.service.consul:8081"
-        TRAEFIK_V2_MODE = "true"
-      }
-
+    task "postgres" {
+      vault {}
       resources {
-        cpu    = 256
+        cpu    = 200
         memory = 512
       }
-
+      driver = "docker"
+      config {
+        image = "postgres:18.6"
+        ports = ["report-portal-postgres"]
+      }
+      shutdown_delay = "20s"
       service {
-        name     = "rp-index"
-        port     = "index"
-        provider = "consul"
-
-        tags = [
-          "traefik.enable=true",
-          "traefik.http.routers.rp-index.rule=PathPrefix('/')",
-          "traefik.http.routers.rp-index.rule=Path(`/`)",
-          "traefik.http.routers.rp-index.entrypoints=http",
-          "traefik.http.routers.rp-index.service=rp-index",
-          "traefik.http.services.rp-index.loadbalancer.server.port=8080",
-          "traefik.http.services.rp-index.loadbalancer.server.scheme=http"
-        ]
-
+        port = "report-portal-postgres"
+        name = "report-portal-postgres"
         check {
-          port     = "index"
-          name     = "index-health"
-          type     = "http"
-          path     = "/health"
-          interval = "20s"
+          name     = "report-portal-postgres-healthy"
+          type     = "script"
+          command  = "pg_isready"
+          args     = ["-d", "$POSTGRES_DB", "-U", "$POSTGRES_USER"]
+          interval = "10s"
           timeout  = "5s"
         }
       }
-    }
-
-    # UI service - web interface
-    task "ui" {
-      driver = "docker"
-
-      config {
-        image = "reportportal/service-ui:5.14.2"
-        ports = ["ui"]
-      }
-
-      env {
-        RP_SERVER_PORT = "8080"
-      }
-
-      resources {
-        cpu    = 512
-        memory = 1024
-      }
-
-      service {
-        name     = "rp-ui"
-        port     = "ui"
-        provider = "consul"
-
-        tags = [
-          "traefik.enable=true",
-          "traefik.http.routers.rp-ui.rule=PathPrefix('/ui')",
-          "traefik.http.routers.rp-ui.rule=PathPrefix(`/ui`)",
-          "traefik.http.routers.rp-ui.entrypoints=http",
-          "traefik.http.routers.rp-ui.middlewares=rp-ui-strip-prefix",
-          "traefik.http.middlewares.rp-ui-strip-prefix.stripprefix.prefixes=/ui",
-          "traefik.http.routers.rp-ui.service=rp-ui",
-          "traefik.http.services.rp-ui.loadbalancer.server.port=8084",
-          "traefik.http.services.rp-ui.loadbalancer.server.scheme=http"
-        ]
-
-        check {
-          port     = "ui"
-          name     = "ui-health"
-          type     = "http"
-          path     = "/health"
-          interval = "30s"
-          timeout  = "10s"
-        }
-      }
-    }
-
-    # API service - backend API
-    task "api" {
-      driver = "docker"
-
-      config {
-        image = "reportportal/service-api:5.14.0"
-        ports = ["api"]
-      }
-
-
-
-      vault {
-        policies      = ["nomad-read"]
-        change_mode   = "signal"
-        change_signal = "SIGHUP"
-      }
-
       template {
-        data        = <<EOF
-{{- range service "rp-db" }}
-RP_DB_HOST={{ .Address }}
-RP_DB_PORT={{ .Port }}
-{{- end }}
-{{- range service "rp-rabbit" }}
-RP_AMQP_HOST={{ .Address }}
-RP_AMQP_PORT={{ .Port }}
-{{- end }}
-{{- range service "rp-rabbit-management" }}
-RP_AMQP_APIPORT={{ .Port }}
-{{- end }}
-RP_DB_NAME=${var.db_name}
-RP_AMQP_ANALYZER_VHOST=analyzer
-{{- with secret "hashiatho.me-v2/data/report_portal" }}
-RP_DB_USER={{ .Data.data.postgres_user }}
-RP_DB_PASS={{ .Data.data.postgres_pass }}
-RP_AMQP_USER={{ .Data.data.rabbit_user }}
-RP_AMQP_PASS={{ .Data.data.rabbit_pass }}
-RP_AMQP_APIUSER={{ .Data.data.rabbit_user }}
-RP_AMQP_APIPASS={{ .Data.data.rabbit_pass }}
-{{- end }}
-RP_JOBS_BASEURL=http://{{ env "NOMAD_ADDR_jobs" }}
-EOF
-        destination = "local/api.env"
-        env         = true
         change_mode = "noop"
-        wait {
-          min = "2s"
-          max = "60s"
-        }
+        # Secrets for the postgres database
+        # These are read from Vault in hashiatho.me-v2/report_portal
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/report_portal" }}
+POSTGRES_USER="{{ .Data.data.postgres_user }}"
+POSTGRES_PASSWORD="{{ .Data.data.postgres_pass }}"
+POSTGRES_DB="reportportal"
+{{ end }}
+      EOT
+        env         = true
+        destination = "local/postgres.env"
       }
+    }
 
-      env {
-        DATASTORE_TYPE                                           = "filesystem"
-        LOGGING_LEVEL_ORG_HIBERNATE_SQL                          = "info"
-        RP_REQUESTLOGGING                                        = "false"
-        AUDIT_LOGGER                                             = "OFF"
-        MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED                  = "false"
-        RP_ENVIRONMENT_VARIABLE_ALLOW_DELETE_ACCOUNT             = "false"
-        JAVA_OPTS                                                = "-Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Dcom.sun.management.jmxremote.rmi.port=12349 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=0.0.0.0 -Dspring.main.allow-bean-definition-overriding=true"
-        COM_TA_REPORTPORTAL_JOB_INTERRUPT_BROKEN_LAUNCHES_CRON   = "PT1H"
-        RP_ENVIRONMENT_VARIABLE_PATTERN_ANALYSIS_BATCH_SIZE      = "100"
-        RP_ENVIRONMENT_VARIABLE_PATTERN_ANALYSIS_PREFETCH_COUNT  = "1"
-        RP_ENVIRONMENT_VARIABLE_PATTERN_ANALYSIS_CONSUMERS_COUNT = "1"
-        REPORTING_QUEUES_COUNT                                   = "10"
-        REPORTING_CONSUMER_PREFETCHCOUNT                         = "10"
-        REPORTING_PARKINGLOT_TTL_DAYS                            = "7"
-        # Disable plugin loading entirely
-        # RP_PLUGIN_STARTUP_ENABLED = "false"
-        LOGGING_LEVEL_COM_EPAM_TA_REPORTPORTAL_PLUGIN = "OFF"
-      }
-
+    task "rabbit" {
+      vault {}
       resources {
-        cpu    = 2048
-        memory = 2048
+        cpu    = 100
+        memory = 150
       }
-
-      volume_mount {
-        volume      = "storage"
-        destination = "/data/storage"
-      }
-
-      service {
-        name     = "rp-api"
-        port     = "api"
-        provider = "consul"
-
-        tags = [
-          "traefik.enable=true",
-          "traefik.http.routers.rp-api.rule=Path(`api`)",
-          "traefik.http.routers.rp-api.rule=PathPrefix(`/api`)",
-          "traefik.http.routers.rp-api.entrypoints=http",
-          "traefik.http.routers.rp-api.middlewares=rp-api-strip-prefix",
-          "traefik.http.middlewares.rp-api-strip-prefix.stripprefix.prefixes=/api",
-          "traefik.http.routers.rp-api.service=rp-api",
-          "traefik.http.services.rp-api.loadbalancer.server.port=8585",
-          "traefik.http.services.rp-api.loadbalancer.server.scheme=http"
+      driver = "docker"
+      config {
+        image = "rabbitmq:4.4.0-management"
+        ports = ["rabbitmq", "rabbit-api"]
+        volumes = [
+          "local/enabled_plugins:/etc/rabbitmq/enabled_plugins"
         ]
-
-        check {
-          name     = "api-health"
-          type     = "http"
-          path     = "/health"
-          interval = "60s"
-          timeout  = "20s"
-        }
       }
-    }
-
-    # UAT service - authorization and authentication
-    task "uat" {
-      driver = "docker"
-      lifecycle {
-        hook = "poststart"
-      }
-      config {
-        image = "reportportal/service-authorization:5.13.2"
-        ports = ["uat"]
-      }
-
-      vault {
-        policies      = ["nomad-read"]
-        change_mode   = "signal"
-        change_signal = "SIGHUP"
-      }
-
       template {
-        data        = <<EOF
-{{- range service "rp-db" }}
-RP_DB_HOST={{ .Address }}
-RP_DB_PORT={{ .Port }}
-{{- end }}
-{{- range service "rp-rabbit" }}
-RP_AMQP_HOST={{ .Address }}
-RP_AMQP_PORT={{ .Port }}
-{{- end }}
-{{- range service "rp-rabbit-management" }}
-RP_AMQP_APIPORT={{ .Port }}
-{{- end }}
-RP_DB_NAME=${var.db_name}
-DATASTORE_TYPE=filesystem
-RP_AMQP_ANALYZER_VHOST=analyzer
-{{- with secret "hashiatho.me-v2/data/report_portal" }}
-RP_DB_USER={{ .Data.data.postgres_user }}
-RP_DB_PASS={{ .Data.data.postgres_pass }}
-RP_AMQP_USER={{ .Data.data.rabbit_user }}
-RP_AMQP_PASS={{ .Data.data.rabbit_pass }}
-RP_AMQP_APIUSER={{ .Data.data.rabbit_user }}
-RP_AMQP_APIPASS={{ .Data.data.rabbit_pass }}
-RP_INITIAL_ADMIN_PASSWORD={{ .Data.data.rp_initial_password }}
-{{- end }}
-EOF
-        destination = "local/uat.env"
-        env         = true
-        change_mode = "restart"
-        wait {
-          min = "2s"
-          max = "60s"
-        }
+        data        = <<EOT
+  [rabbitmq_management,rabbitmq_consistent_hash_exchange,rabbitmq_auth_backend_ldap,rabbitmq_shovel,rabbitmq_shovel_management].
+      EOT
+        destination = "local/enabled_plugins"
       }
-
-      env {
-        RP_SESSION_LIVE      = "86400"
-        RP_SAML_SESSION-LIVE = "4320"
-        JAVA_OPTS            = "-Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0 --add-opens=java.base/java.lang=ALL-UNNAMED"
-      }
-
-      resources {
-        cpu    = 1024
-        memory = 1024
-      }
-      volume_mount {
-        volume      = "storage"
-        destination = "/data/storage"
-      }
-
-      service {
-        name     = "rp-uat"
-        port     = "uat"
-        provider = "consul"
-
-        tags = [
-          "traefik.enable=true",
-          "traefik.http.routers.rp-uat.rule=Path(`/uat`)",
-          "traefik.http.routers.rp-uat.rule=PathPrefix(`/uat`)",
-          "traefik.http.routers.rp-uat.entrypoints=http",
-          "traefik.http.routers.rp-uat.middlewares=rp-uat-strip-prefix",
-          "traefik.http.middlewares.rp-uat-strip-prefix.stripprefix.prefixes=/uat",
-          "traefik.http.routers.rp-uat.service=rp-uat",
-          "traefik.http.services.rp-uat.loadbalancer.server.port=9999",
-          "traefik.http.services.rp-uat.loadbalancer.server.scheme=http"
-        ]
-
-        check {
-          name     = "uat-health"
-          type     = "http"
-          path     = "/health"
-          interval = "60s"
-          timeout  = "20s"
-        }
-      }
-    }
-
-    # Jobs service - scheduled job processor
-    task "jobs" {
-      driver = "docker"
-
-      config {
-        image = "reportportal/service-jobs:5.14.0"
-        ports = ["jobs"]
-      }
-
-      vault {
-        policies      = ["nomad-read"]
-        change_mode   = "signal"
-        change_signal = "SIGHUP"
-      }
-
       template {
-        data        = <<EOF
-{{- range service "rp-db" }}
-RP_DB_HOST={{ .Address }}
-RP_DB_PORT={{ .Port }}
-{{- end }}
-{{- range service "rp-rabbit" }}
-RP_AMQP_HOST={{ .Address }}
-RP_AMQP_PORT={{ .Port }}
-{{- end }}
-{{- range service "rp-rabbit-management" }}
-RP_AMQP_APIPORT={{ .Port }}
-{{- end }}
-RP_DB_NAME=${var.db_name}
-RP_AMQP_ANALYZER_VHOST=analyzer
-{{- with secret "hashiatho.me-v2/data/report_portal" }}
-RP_DB_USER={{ .Data.data.postgres_user }}
-RP_DB_PASS={{ .Data.data.postgres_pass }}
-RP_AMQP_USER={{ .Data.data.rabbit_user }}
-RP_AMQP_PASS={{ .Data.data.rabbit_pass }}
-RP_AMQP_APIUSER={{ .Data.data.rabbit_user }}
-RP_AMQP_APIPASS={{ .Data.data.rabbit_pass }}
-{{- end }}
-EOF
-        destination = "local/jobs.env"
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/report_portal" }}
+RABBITMQ_DEFAULT_USER="{{ .Data.rabbit_user }}"
+RABBITMQ_DEFAULT_PASS="{{ .Data.data.rabbit_pass }}"
+{{ end }}
+      EOT
+        destination = "local/rabbit.env"
         env         = true
-        change_mode = "noop"
-        wait {
-          min = "2s"
-          max = "60s"
-        }
-      }
-
-      env {
-        DATASTORE_TYPE                                            = "filesystem"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_ATTACHMENT_CRON             = "0 0 */24 * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_LOG_CRON                    = "0 0 */24 * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_LAUNCH_CRON                 = "0 0 */24 * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_STORAGE_CRON                = "0 0 */24 * * *"
-        RP_ENVIRONMENT_VARIABLE_STORAGE_PROJECT_CRON              = "0 */5 * * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_EXPIREDUSER_CRON            = "0 0 */24 * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_EXPIREDUSER_RETENTIONPERIOD = "365"
-        RP_ENVIRONMENT_VARIABLE_NOTIFICATION_EXPIREDUSER_CRON     = "0 0 */24 * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_EVENTS_RETENTIONPERIOD      = "365"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_EVENTS_CRON                 = "0 30 05 * * *"
-        RP_ENVIRONMENT_VARIABLE_CLEAN_STORAGE_CHUNKSIZE           = "20000"
-        RP_PROCESSING_LOG_MAXBATCHSIZE                            = "2000"
-        RP_PROCESSING_LOG_MAXBATCHTIMEOUT                         = "6000"
-        RP_AMQP_MAXLOGCONSUMER                                    = "1"
-        JAVA_OPTS                                                 = "-Djava.security.egd=file:/dev/./urandom -XX:+UseG1GC -XX:+UseStringDeduplication -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=60 -XX:MaxRAMPercentage=70.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
-      }
-
-      resources {
-        cpu    = 1024
-        memory = 1024
-      }
-
-      volume_mount {
-        volume      = "storage"
-        destination = "/data/storage"
-      }
-
-      service {
-        name     = "rp-jobs"
-        port     = "jobs"
-        provider = "consul"
-
-        tags = [
-          "traefik.enable=true",
-          "traefik.http.routers.rp-jobs.rule=PathPrefix(`/jobs`)",
-          "traefik.http.routers.rp-jobs.rule=Path(`/jobs`)",
-          "traefik.http.routers.rp-jobs.entrypoints=http",
-          "traefik.http.routers.rp-jobs.middlewares=rp-jobs-strip-prefix",
-          "traefik.http.middlewares.rp-jobs-strip-prefix.stripprefix.prefixes=/jobs",
-          "traefik.http.routers.rp-jobs.service=rp-jobs",
-          "traefik.http.services.rp-jobs.loadbalancer.server.port=8686",
-          "traefik.http.services.rp-jobs.loadbalancer.server.scheme=http"
-        ]
-
-        check {
-          name     = "jobs-health"
-          type     = "http"
-          path     = "/health"
-          interval = "60s"
-          timeout  = "20s"
-        }
       }
     }
 
-    # Analyzer service - automatic test result analysis (optional)
-    task "analyzer" {
+    task "opensearch" {
+      vault {}
+      resources {
+        cpu    = 2000
+        memory = 1600
+      }
       driver = "docker"
-
       config {
-        image = "reportportal/service-auto-analyzer:5.14.0"
-        ports = ["analyzer"]
+        image = "opensearchproject/opensearch:3.9.0"
+        ports = ["opensearch"]
       }
-
       template {
-        data        = <<EOF
-{{- with secret "hashiatho.me-v2/data/report_portal" }}
-{{- $rabbit_user := .Data.data.rabbit_user }}
-{{- $rabbit_pass := .Data.data.rabbit_pass }}
-{{- range service "rp-rabbit" }}
-AMQP_URL=amqp://{{ $rabbit_user }}:{{ $rabbit_pass }}@{{ .Address }}:{{ .Port }}
-{{- end }}
-{{- end }}
-{{- range service "rp-opensearch" }}
-ES_HOSTS=http://{{ .Address }}:{{ .Port }}
-{{- end }}
-EOF
-        destination = "local/analyzer.env"
+        data        = <<EOT
+discovery.type=single-node
+plugins.security.disabled="true"
+bootstrap.memory_lock="true"
+OPENSEARCH_JAVA_OPTS="-Xms512m -Xmx512m"
+DISABLE_INSTALL_DEMO_CONFIG="true"
+      EOT
+        destination = "local/opensearch.env"
         env         = true
-        change_mode = "noop"
-        wait {
-          min = "2s"
-          max = "60s"
-        }
       }
-
-      env {
-        LOGGING_LEVEL             = "info"
-        AMQP_EXCHANGE_NAME        = "analyzer-default"
-        AMQP_VIRTUAL_HOST         = "analyzer"
-        ANALYZER_BINARYSTORE_TYPE = "filesystem"
-      }
-
-      resources {
-        cpu    = 512
-        memory = 1024
-      }
-
-      volume_mount {
-        volume      = "storage"
-        destination = "/data/storage"
-      }
-
-      # service {
-      #   name = "rp-analyzer"
-      #   port = "analyzer"
-      #   provider = "consul"
-
-      #   check {
-      #     name     = "analyzer-health"
-      #     type     = "tcp"
-      #     interval = "60s"
-      #     timeout  = "10s"
-      #   }
-      # }
     }
 
-    # Analyzer Train service - ML training for analysis (optional)
-    task "analyzer-train" {
-      driver = "docker"
-
-      config {
-        image = "reportportal/service-auto-analyzer:5.14.0"
-        ports = ["analyzer-train"]
-      }
-
-      template {
-        data        = <<EOF
-{{- with secret "hashiatho.me-v2/data/report_portal" }}
-{{- $rabbit_user := .Data.data.rabbit_user }}
-{{- $rabbit_pass := .Data.data.rabbit_pass }}
-{{- range service "rp-rabbit" }}
-AMQP_URL=amqp://{{ $rabbit_user }}:{{ $rabbit_pass }}@{{ .Address }}:{{ .Port }}
-{{- end }}
-{{- end }}
-{{- range service "rp-opensearch" }}
-ES_HOSTS=http://{{ .Address }}:{{ .Port }}
-{{- end }}
-EOF
-        destination = "local/analyzer-train.env"
-        env         = true
-        change_mode = "noop"
-        wait {
-          min = "2s"
-          max = "60s"
-        }
-      }
-
-      env {
-        LOGGING_LEVEL             = "info"
-        AMQP_EXCHANGE_NAME        = "analyzer-default"
-        AMQP_VIRTUAL_HOST         = "analyzer"
-        ANALYZER_BINARYSTORE_TYPE = "filesystem"
-        INSTANCE_TASK_TYPE        = "train"
-        UWSGI_WORKERS             = "1"
-      }
-
-      resources {
-        cpu    = 512
-        memory = 1024
-      }
-
-      volume_mount {
-        volume      = "storage"
-        destination = "/data/storage"
-      }
-
-      # service {
-      #   name = "rp-analyzer-train"
-      #   port = "analyzer-train"
-      #   provider = "consul"
-
-      #   check {
-      #     name     = "analyzer-train-health"
-      #     type     = "tcp"
-      #     interval = "60s"
-      #     timeout  = "10s"
-      #   }
-      # }
-    }
   }
+
+  #   group "rp-services" {
+  #     network {}
+  #
+  #     task "migrations" {
+  #       vault {}
+  #       driver = "docker"
+  #       config {
+  #         image = "reportportal/migrations:6.0.0"
+  #       }
+  #       template {
+  #       data = <<EOT
+  #       EOT
+  #       }
+  #     }
+  #   }
+
+  #     # Index service - main entry point
+  #     task "index" {
+  #       driver = "docker"
+  #
+  #       config {
+  #         image = "reportportal/service-index:5.14.0"
+  #         ports = ["index"]
+  #       }
+  #
+  #       env {
+  #         LB_URL          = "http://traefik.service.consul:8081"
+  #         TRAEFIK_V2_MODE = "true"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 256
+  #         memory = 512
+  #       }
+  #
+  #       service {
+  #         name     = "rp-index"
+  #         port     = "index"
+  #         provider = "consul"
+  #
+  #         tags = [
+  #           "traefik.enable=true",
+  #           "traefik.http.routers.rp-index.rule=PathPrefix('/')",
+  #           "traefik.http.routers.rp-index.rule=Path(`/`)",
+  #           "traefik.http.routers.rp-index.entrypoints=http",
+  #           "traefik.http.routers.rp-index.service=rp-index",
+  #           "traefik.http.services.rp-index.loadbalancer.server.port=8080",
+  #           "traefik.http.services.rp-index.loadbalancer.server.scheme=http"
+  #         ]
+  #
+  #         check {
+  #           port     = "index"
+  #           name     = "index-health"
+  #           type     = "http"
+  #           path     = "/health"
+  #           interval = "20s"
+  #           timeout  = "5s"
+  #         }
+  #       }
+  #     }
+  #
+  #     # UI service - web interface
+  #     task "ui" {
+  #       driver = "docker"
+  #
+  #       config {
+  #         image = "reportportal/service-ui:5.14.2"
+  #         ports = ["ui"]
+  #       }
+  #
+  #       env {
+  #         RP_SERVER_PORT = "8080"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 512
+  #         memory = 1024
+  #       }
+  #
+  #       service {
+  #         name     = "rp-ui"
+  #         port     = "ui"
+  #         provider = "consul"
+  #
+  #         tags = [
+  #           "traefik.enable=true",
+  #           "traefik.http.routers.rp-ui.rule=PathPrefix('/ui')",
+  #           "traefik.http.routers.rp-ui.rule=PathPrefix(`/ui`)",
+  #           "traefik.http.routers.rp-ui.entrypoints=http",
+  #           "traefik.http.routers.rp-ui.middlewares=rp-ui-strip-prefix",
+  #           "traefik.http.middlewares.rp-ui-strip-prefix.stripprefix.prefixes=/ui",
+  #           "traefik.http.routers.rp-ui.service=rp-ui",
+  #           "traefik.http.services.rp-ui.loadbalancer.server.port=8084",
+  #           "traefik.http.services.rp-ui.loadbalancer.server.scheme=http"
+  #         ]
+  #
+  #         check {
+  #           port     = "ui"
+  #           name     = "ui-health"
+  #           type     = "http"
+  #           path     = "/health"
+  #           interval = "30s"
+  #           timeout  = "10s"
+  #         }
+  #       }
+  #     }
+  #
+  #     # API service - backend API
+  #     task "api" {
+  #       driver = "docker"
+  #
+  #       config {
+  #         image = "reportportal/service-api:5.14.0"
+  #         ports = ["api"]
+  #       }
+  #
+  #
+  #
+  #       vault {
+  #         policies      = ["nomad-read"]
+  #         change_mode   = "signal"
+  #         change_signal = "SIGHUP"
+  #       }
+  #
+  #       template {
+  #         data        = <<EOF
+  # {{- range service "rp-db" }}
+  # RP_DB_HOST={{ .Address }}
+  # RP_DB_PORT={{ .Port }}
+  # {{- end }}
+  # {{- range service "rp-rabbit" }}
+  # RP_AMQP_HOST={{ .Address }}
+  # RP_AMQP_PORT={{ .Port }}
+  # {{- end }}
+  # {{- range service "rp-rabbit-management" }}
+  # RP_AMQP_APIPORT={{ .Port }}
+  # {{- end }}
+  # RP_DB_NAME=${var.db_name}
+  # RP_AMQP_ANALYZER_VHOST=analyzer
+  # {{- with secret "hashiatho.me-v2/data/report_portal" }}
+  # RP_DB_USER={{ .Data.data.postgres_user }}
+  # RP_DB_PASS={{ .Data.data.postgres_pass }}
+  # RP_AMQP_USER={{ .Data.data.rabbit_user }}
+  # RP_AMQP_PASS={{ .Data.data.rabbit_pass }}
+  # RP_AMQP_APIUSER={{ .Data.data.rabbit_user }}
+  # RP_AMQP_APIPASS={{ .Data.data.rabbit_pass }}
+  # {{- end }}
+  # RP_JOBS_BASEURL=http://{{ env "NOMAD_ADDR_jobs" }}
+  # EOF
+  #         destination = "local/api.env"
+  #         env         = true
+  #         change_mode = "noop"
+  #         wait {
+  #           min = "2s"
+  #           max = "60s"
+  #         }
+  #       }
+  #
+  #       env {
+  #         DATASTORE_TYPE                                           = "filesystem"
+  #         LOGGING_LEVEL_ORG_HIBERNATE_SQL                          = "info"
+  #         RP_REQUESTLOGGING                                        = "false"
+  #         AUDIT_LOGGER                                             = "OFF"
+  #         MANAGEMENT_HEALTH_ELASTICSEARCH_ENABLED                  = "false"
+  #         RP_ENVIRONMENT_VARIABLE_ALLOW_DELETE_ACCOUNT             = "false"
+  #         JAVA_OPTS                                                = "-Xmx1g -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Dcom.sun.management.jmxremote.rmi.port=12349 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=0.0.0.0 -Dspring.main.allow-bean-definition-overriding=true"
+  #         COM_TA_REPORTPORTAL_JOB_INTERRUPT_BROKEN_LAUNCHES_CRON   = "PT1H"
+  #         RP_ENVIRONMENT_VARIABLE_PATTERN_ANALYSIS_BATCH_SIZE      = "100"
+  #         RP_ENVIRONMENT_VARIABLE_PATTERN_ANALYSIS_PREFETCH_COUNT  = "1"
+  #         RP_ENVIRONMENT_VARIABLE_PATTERN_ANALYSIS_CONSUMERS_COUNT = "1"
+  #         REPORTING_QUEUES_COUNT                                   = "10"
+  #         REPORTING_CONSUMER_PREFETCHCOUNT                         = "10"
+  #         REPORTING_PARKINGLOT_TTL_DAYS                            = "7"
+  #         # Disable plugin loading entirely
+  #         # RP_PLUGIN_STARTUP_ENABLED = "false"
+  #         LOGGING_LEVEL_COM_EPAM_TA_REPORTPORTAL_PLUGIN = "OFF"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 2048
+  #         memory = 2048
+  #       }
+  #
+  #       volume_mount {
+  #         volume      = "storage"
+  #         destination = "/data/storage"
+  #       }
+  #
+  #       service {
+  #         name     = "rp-api"
+  #         port     = "api"
+  #         provider = "consul"
+  #
+  #         tags = [
+  #           "traefik.enable=true",
+  #           "traefik.http.routers.rp-api.rule=Path(`api`)",
+  #           "traefik.http.routers.rp-api.rule=PathPrefix(`/api`)",
+  #           "traefik.http.routers.rp-api.entrypoints=http",
+  #           "traefik.http.routers.rp-api.middlewares=rp-api-strip-prefix",
+  #           "traefik.http.middlewares.rp-api-strip-prefix.stripprefix.prefixes=/api",
+  #           "traefik.http.routers.rp-api.service=rp-api",
+  #           "traefik.http.services.rp-api.loadbalancer.server.port=8585",
+  #           "traefik.http.services.rp-api.loadbalancer.server.scheme=http"
+  #         ]
+  #
+  #         check {
+  #           name     = "api-health"
+  #           type     = "http"
+  #           path     = "/health"
+  #           interval = "60s"
+  #           timeout  = "20s"
+  #         }
+  #       }
+  #     }
+  #
+  #     # UAT service - authorization and authentication
+  #     task "uat" {
+  #       driver = "docker"
+  #       lifecycle {
+  #         hook = "poststart"
+  #       }
+  #       config {
+  #         image = "reportportal/service-authorization:5.13.2"
+  #         ports = ["uat"]
+  #       }
+  #
+  #       vault {
+  #         policies      = ["nomad-read"]
+  #         change_mode   = "signal"
+  #         change_signal = "SIGHUP"
+  #       }
+  #
+  #       template {
+  #         data        = <<EOF
+  # {{- range service "rp-db" }}
+  # RP_DB_HOST={{ .Address }}
+  # RP_DB_PORT={{ .Port }}
+  # {{- end }}
+  # {{- range service "rp-rabbit" }}
+  # RP_AMQP_HOST={{ .Address }}
+  # RP_AMQP_PORT={{ .Port }}
+  # {{- end }}
+  # {{- range service "rp-rabbit-management" }}
+  # RP_AMQP_APIPORT={{ .Port }}
+  # {{- end }}
+  # RP_DB_NAME=${var.db_name}
+  # DATASTORE_TYPE=filesystem
+  # RP_AMQP_ANALYZER_VHOST=analyzer
+  # {{- with secret "hashiatho.me-v2/data/report_portal" }}
+  # RP_DB_USER={{ .Data.data.postgres_user }}
+  # RP_DB_PASS={{ .Data.data.postgres_pass }}
+  # RP_AMQP_USER={{ .Data.data.rabbit_user }}
+  # RP_AMQP_PASS={{ .Data.data.rabbit_pass }}
+  # RP_AMQP_APIUSER={{ .Data.data.rabbit_user }}
+  # RP_AMQP_APIPASS={{ .Data.data.rabbit_pass }}
+  # RP_INITIAL_ADMIN_PASSWORD={{ .Data.data.rp_initial_password }}
+  # {{- end }}
+  # EOF
+  #         destination = "local/uat.env"
+  #         env         = true
+  #         change_mode = "restart"
+  #         wait {
+  #           min = "2s"
+  #           max = "60s"
+  #         }
+  #       }
+  #
+  #       env {
+  #         RP_SESSION_LIVE      = "86400"
+  #         RP_SAML_SESSION-LIVE = "4320"
+  #         JAVA_OPTS            = "-Djava.security.egd=file:/dev/./urandom -XX:MinRAMPercentage=60.0 -XX:MaxRAMPercentage=90.0 --add-opens=java.base/java.lang=ALL-UNNAMED"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 1024
+  #         memory = 1024
+  #       }
+  #       volume_mount {
+  #         volume      = "storage"
+  #         destination = "/data/storage"
+  #       }
+  #
+  #       service {
+  #         name     = "rp-uat"
+  #         port     = "uat"
+  #         provider = "consul"
+  #
+  #         tags = [
+  #           "traefik.enable=true",
+  #           "traefik.http.routers.rp-uat.rule=Path(`/uat`)",
+  #           "traefik.http.routers.rp-uat.rule=PathPrefix(`/uat`)",
+  #           "traefik.http.routers.rp-uat.entrypoints=http",
+  #           "traefik.http.routers.rp-uat.middlewares=rp-uat-strip-prefix",
+  #           "traefik.http.middlewares.rp-uat-strip-prefix.stripprefix.prefixes=/uat",
+  #           "traefik.http.routers.rp-uat.service=rp-uat",
+  #           "traefik.http.services.rp-uat.loadbalancer.server.port=9999",
+  #           "traefik.http.services.rp-uat.loadbalancer.server.scheme=http"
+  #         ]
+  #
+  #         check {
+  #           name     = "uat-health"
+  #           type     = "http"
+  #           path     = "/health"
+  #           interval = "60s"
+  #           timeout  = "20s"
+  #         }
+  #       }
+  #     }
+  #
+  #     # Jobs service - scheduled job processor
+  #     task "jobs" {
+  #       driver = "docker"
+  #
+  #       config {
+  #         image = "reportportal/service-jobs:5.14.0"
+  #         ports = ["jobs"]
+  #       }
+  #
+  #       vault {
+  #         policies      = ["nomad-read"]
+  #         change_mode   = "signal"
+  #         change_signal = "SIGHUP"
+  #       }
+  #
+  #       template {
+  #         data        = <<EOF
+  # {{- range service "rp-db" }}
+  # RP_DB_HOST={{ .Address }}
+  # RP_DB_PORT={{ .Port }}
+  # {{- end }}
+  # {{- range service "rp-rabbit" }}
+  # RP_AMQP_HOST={{ .Address }}
+  # RP_AMQP_PORT={{ .Port }}
+  # {{- end }}
+  # {{- range service "rp-rabbit-management" }}
+  # RP_AMQP_APIPORT={{ .Port }}
+  # {{- end }}
+  # RP_DB_NAME=${var.db_name}
+  # RP_AMQP_ANALYZER_VHOST=analyzer
+  # {{- with secret "hashiatho.me-v2/data/report_portal" }}
+  # RP_DB_USER={{ .Data.data.postgres_user }}
+  # RP_DB_PASS={{ .Data.data.postgres_pass }}
+  # RP_AMQP_USER={{ .Data.data.rabbit_user }}
+  # RP_AMQP_PASS={{ .Data.data.rabbit_pass }}
+  # RP_AMQP_APIUSER={{ .Data.data.rabbit_user }}
+  # RP_AMQP_APIPASS={{ .Data.data.rabbit_pass }}
+  # {{- end }}
+  # EOF
+  #         destination = "local/jobs.env"
+  #         env         = true
+  #         change_mode = "noop"
+  #         wait {
+  #           min = "2s"
+  #           max = "60s"
+  #         }
+  #       }
+  #
+  #       env {
+  #         DATASTORE_TYPE                                            = "filesystem"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_ATTACHMENT_CRON             = "0 0 */24 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_LOG_CRON                    = "0 0 */24 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_LAUNCH_CRON                 = "0 0 */24 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_STORAGE_CRON                = "0 0 */24 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_STORAGE_PROJECT_CRON              = "0 */5 * * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_EXPIREDUSER_CRON            = "0 0 */24 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_EXPIREDUSER_RETENTIONPERIOD = "365"
+  #         RP_ENVIRONMENT_VARIABLE_NOTIFICATION_EXPIREDUSER_CRON     = "0 0 */24 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_EVENTS_RETENTIONPERIOD      = "365"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_EVENTS_CRON                 = "0 30 05 * * *"
+  #         RP_ENVIRONMENT_VARIABLE_CLEAN_STORAGE_CHUNKSIZE           = "20000"
+  #         RP_PROCESSING_LOG_MAXBATCHSIZE                            = "2000"
+  #         RP_PROCESSING_LOG_MAXBATCHTIMEOUT                         = "6000"
+  #         RP_AMQP_MAXLOGCONSUMER                                    = "1"
+  #         JAVA_OPTS                                                 = "-Djava.security.egd=file:/dev/./urandom -XX:+UseG1GC -XX:+UseStringDeduplication -XX:G1ReservePercent=20 -XX:InitiatingHeapOccupancyPercent=60 -XX:MaxRAMPercentage=70.0 -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 1024
+  #         memory = 1024
+  #       }
+  #
+  #       volume_mount {
+  #         volume      = "storage"
+  #         destination = "/data/storage"
+  #       }
+  #
+  #       service {
+  #         name     = "rp-jobs"
+  #         port     = "jobs"
+  #         provider = "consul"
+  #
+  #         tags = [
+  #           "traefik.enable=true",
+  #           "traefik.http.routers.rp-jobs.rule=PathPrefix(`/jobs`)",
+  #           "traefik.http.routers.rp-jobs.rule=Path(`/jobs`)",
+  #           "traefik.http.routers.rp-jobs.entrypoints=http",
+  #           "traefik.http.routers.rp-jobs.middlewares=rp-jobs-strip-prefix",
+  #           "traefik.http.middlewares.rp-jobs-strip-prefix.stripprefix.prefixes=/jobs",
+  #           "traefik.http.routers.rp-jobs.service=rp-jobs",
+  #           "traefik.http.services.rp-jobs.loadbalancer.server.port=8686",
+  #           "traefik.http.services.rp-jobs.loadbalancer.server.scheme=http"
+  #         ]
+  #
+  #         check {
+  #           name     = "jobs-health"
+  #           type     = "http"
+  #           path     = "/health"
+  #           interval = "60s"
+  #           timeout  = "20s"
+  #         }
+  #       }
+  #     }
+  #
+  #     # Analyzer service - automatic test result analysis (optional)
+  #     task "analyzer" {
+  #       driver = "docker"
+  #
+  #       config {
+  #         image = "reportportal/service-auto-analyzer:5.14.0"
+  #         ports = ["analyzer"]
+  #       }
+  #
+  #       template {
+  #         data        = <<EOF
+  # {{- with secret "hashiatho.me-v2/data/report_portal" }}
+  # {{- $rabbit_user := .Data.data.rabbit_user }}
+  # {{- $rabbit_pass := .Data.data.rabbit_pass }}
+  # {{- range service "rp-rabbit" }}
+  # AMQP_URL=amqp://{{ $rabbit_user }}:{{ $rabbit_pass }}@{{ .Address }}:{{ .Port }}
+  # {{- end }}
+  # {{- end }}
+  # {{- range service "rp-opensearch" }}
+  # ES_HOSTS=http://{{ .Address }}:{{ .Port }}
+  # {{- end }}
+  # EOF
+  #         destination = "local/analyzer.env"
+  #         env         = true
+  #         change_mode = "noop"
+  #         wait {
+  #           min = "2s"
+  #           max = "60s"
+  #         }
+  #       }
+  #
+  #       env {
+  #         LOGGING_LEVEL             = "info"
+  #         AMQP_EXCHANGE_NAME        = "analyzer-default"
+  #         AMQP_VIRTUAL_HOST         = "analyzer"
+  #         ANALYZER_BINARYSTORE_TYPE = "filesystem"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 512
+  #         memory = 1024
+  #       }
+  #
+  #       volume_mount {
+  #         volume      = "storage"
+  #         destination = "/data/storage"
+  #       }
+  #
+  #       # service {
+  #       #   name = "rp-analyzer"
+  #       #   port = "analyzer"
+  #       #   provider = "consul"
+  #
+  #       #   check {
+  #       #     name     = "analyzer-health"
+  #       #     type     = "tcp"
+  #       #     interval = "60s"
+  #       #     timeout  = "10s"
+  #       #   }
+  #       # }
+  #     }
+  #
+  #     # Analyzer Train service - ML training for analysis (optional)
+  #     task "analyzer-train" {
+  #       driver = "docker"
+  #
+  #       config {
+  #         image = "reportportal/service-auto-analyzer:5.14.0"
+  #         ports = ["analyzer-train"]
+  #       }
+  #
+  #       template {
+  #         data        = <<EOF
+  # {{- with secret "hashiatho.me-v2/data/report_portal" }}
+  # {{- $rabbit_user := .Data.data.rabbit_user }}
+  # {{- $rabbit_pass := .Data.data.rabbit_pass }}
+  # {{- range service "rp-rabbit" }}
+  # AMQP_URL=amqp://{{ $rabbit_user }}:{{ $rabbit_pass }}@{{ .Address }}:{{ .Port }}
+  # {{- end }}
+  # {{- end }}
+  # {{- range service "rp-opensearch" }}
+  # ES_HOSTS=http://{{ .Address }}:{{ .Port }}
+  # {{- end }}
+  # EOF
+  #         destination = "local/analyzer-train.env"
+  #         env         = true
+  #         change_mode = "noop"
+  #         wait {
+  #           min = "2s"
+  #           max = "60s"
+  #         }
+  #       }
+  #
+  #       env {
+  #         LOGGING_LEVEL             = "info"
+  #         AMQP_EXCHANGE_NAME        = "analyzer-default"
+  #         AMQP_VIRTUAL_HOST         = "analyzer"
+  #         ANALYZER_BINARYSTORE_TYPE = "filesystem"
+  #         INSTANCE_TASK_TYPE        = "train"
+  #         UWSGI_WORKERS             = "1"
+  #       }
+  #
+  #       resources {
+  #         cpu    = 512
+  #         memory = 1024
+  #       }
+  #
+  #       volume_mount {
+  #         volume      = "storage"
+  #         destination = "/data/storage"
+  #       }
+  #
+  #       # service {
+  #       #   name = "rp-analyzer-train"
+  #       #   port = "analyzer-train"
+  #       #   provider = "consul"
+  #
+  #       #   check {
+  #       #     name     = "analyzer-train-health"
+  #       #     type     = "tcp"
+  #       #     interval = "60s"
+  #       #     timeout  = "10s"
+  #       #   }
+  #       # }
+  #     }
+  #  }
 }
