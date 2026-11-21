@@ -1,0 +1,45 @@
+= Report Portal
+
+This part contains job definitions for deployment of the https://reportportal.io[Report Portal].
+
+Documentation for Report Portal is at
+
+https://reportportal.io/docs
+
+== Description and Architecture
+
+Report Portal is a set of Java services, which depend on several backing services.
+These can be deployed as a monolithic deployment, or as a multi-tenant deployment if Report Portal services depending on managed backing services provided as part of the underlying platform.
+
+
+=== Backing Services
+
+Report Portal depends on the availability of the following backing services:
+
+* Traefik Gateway
+* Postgres database
+* RabbitMQ
+* OpenSearch
+* Persistent Storage
+
+Note that each of these backing services requires their own persistent storage.
+The persistent storage refers to the report portal services, is configurable per service, which could be either local volume claim or S3 bucket.
+
+=== Report Portal Services
+
+The Report Portal services include:
+
+* migrations
+* ui
+* api
+* jobs
+* analyzer-storage-init
+* analyzer
+
+== Nomad Jobs
+
+In the interest of supporting multiple deployment options, we define a few mutually-exclusive Nomad jobs:
+
+Monolithic deployment:: `report-portal.nomad.hcl` -- all in one deployment including backing services. Suitable for demonstration and single-use deployments.
+Report Portal backing services:: `report-portal-backing-services.nomad.hcl` - Backing services required by an instance of report portal
+Platform tenant:: `report-portal.nomad.hcl` - only report portal services configured to discover and use multitenant platform backing services. This can be used only when these backing services are already deployed.
