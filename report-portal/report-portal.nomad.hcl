@@ -59,6 +59,13 @@ job "report-portal-services" {
       port "report-portal-postgres" {
         static = 5432
       }
+      port "rabbitmq" {
+        static = 5672
+      }
+
+      port "rabbit-api" {
+        static = 15672
+      }
     }
     task "gateway" {
       vault {}
@@ -138,6 +145,38 @@ POSTGRES_DB="reportportal"
       EOT
         env         = true
         destination = "local/postgres.env"
+      }
+    }
+
+    task "rabbit" {
+      vault {}
+      resources {
+        cpu    = 100
+        memory = 150
+      }
+      driver = "docker"
+      config {
+        image = "rabbitmq:4.4.0-management"
+        ports = ["rabbitmq", "rabbit-api"]
+        volumes = [
+          "local/enabled_plugins:/etc/rabbitmq/enabled_plugins"
+        ]
+      }
+      template {
+        data        = <<EOT
+  [rabbitmq_management,rabbitmq_consistent_hash_exchange,rabbitmq_auth_backend_ldap,rabbitmq_shovel,rabbitmq_shovel_management].
+      EOT
+        destination = "local/enabled_plugins"
+      }
+      template {
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/report_portal" }}
+RABBITMQ_DEFAULT_USER="{{ .Data.rabbit_user }}"
+RABBITMQ_DEFAULT_PASS="{{ .Data.data.rabbit_pass }}"
+{{ end }}
+      EOT
+        destination = "local/rabbit.env"
+        env         = true
       }
     }
 
