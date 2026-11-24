@@ -38,22 +38,11 @@ job "report-portal-services" {
   }
 
   group "backing-services" {
-    # The backing services group contains:
-    # Gateway
-    # ports:
-    # - "8080:8080"  ## ReportPortal UI
-    # - "8081:8081"  ## Traefik dashboard
-    # - "443:443"
-    # postgres Database
-    # ports:
-    #
-    # opensearch
-    # Rabbitmq
     network {
       port "gateway-dashboard" {
         static = 8081
       }
-      port "report-portal-ui" {
+      port "gateway-http" {
         static = 8080
       }
       port "report-portal-postgres" {
@@ -74,6 +63,7 @@ job "report-portal-services" {
       port "report-portal-api" {
         static = 8585
       }
+      port "report-portal-ui" {}
     }
     task "gateway" {
       vault {}
@@ -84,8 +74,8 @@ job "report-portal-services" {
       driver = "docker"
       config {
         image = "traefik:v3.7.19"
-        args  = ["--configFile=/etc/traefik/traefik.yml"]
-        ports = ["gateway-dashboard"]
+        args  = ["--configFile=/etc/traefik/traefik.toml"]
+        ports = ["gateway-dashboard", "gateway-http"]
         volumes = [
           "local/traefik.toml:/etc/traefik/traefik.toml"
         ]
@@ -94,7 +84,7 @@ job "report-portal-services" {
         data        = <<EOF
 accesslog = true
 [log]
-  level = "INFO"
+  level = "DEBUG"
 [entryPoints]
   [entryPoints.http]
   address = ":8080"
@@ -104,17 +94,17 @@ accesslog = true
   dashboard = true
   insecure = true
 # Enable the Consul Catalog configuration backend
-[providers.consulCatalog]
+[providers.consulcatalog]
   prefix = "traefik"
-  exposedByDefault = false
-  [providers.consulCatalog.endpoint]
+  exposedbydefault = false
+  [providers.consulcatalog.endpoint]
     address = "172.17.0.1:8500"
-    scheme = "http"
-{{ with secret "hashi_at_home/creds/report_portal"}}
+{{- with secret "hashi_at_home/creds/report_portal"}}
     token = "{{ .Data.token }}"
-{{ end }}
+{{ end -}}
 EOF
         destination = "local/traefik.toml"
+        change_mode = "noop"
       }
       shutdown_delay = "5s"
       service {
@@ -313,17 +303,17 @@ POSTGRES_PASSWORD="{{ .Data.data.postgres_pass }}"
         port = "jobs"
         tags = [
           "traefik.enable=true",
+          "traefik.expose=true",
           "traefik.http.middlewares.jobs-strip-prefix.stripprefix.prefixes=/jobs",
-          "traefik.http.routers.jobs.middlewares=jobs-strip-prefix@consulCatalog",
+          "traefik.http.routers.jobs.middlewares=jobs-strip-prefix",
           "traefik.http.routers.jobs.rule=PathPrefix(`/jobs`)",
           "traefik.http.routers.jobs.service=jobs",
-          "traefik.http.routers.jobs.entrypoints=web",
-          "traefik.http.routers.jobs-secure.middlewares=jobs-strip-prefix@consulCatalog",
+          "traefik.http.routers.jobs.entrypoints=http",
+          "traefik.http.routers.jobs-secure.middlewares=jobs-strip-prefix",
           "traefik.http.routers.jobs-secure.rule=PathPrefix(`/jobs`)",
           "traefik.http.routers.jobs-secure.service=jobs",
           "traefik.http.services.jobs.loadbalancer.server.port=8686",
-          "traefik.http.services.jobs.loadbalancer.server.scheme=http",
-          "traefik.expose=true",
+          "traefik.http.services.jobs.loadbalancer.server.scheme=http"
         ]
         check {
           name     = "report-portal-jobs-healthy"
@@ -392,7 +382,7 @@ RP_AMQP_APIPASS="{{ .Data.data.rabbit_user }}"
         ports = ["report-portal-ui"]
       }
       env {
-        RP_SERVER_PORT = "8080"
+        RP_SERVER_PORT = "${NOMAD_PORT_report-portal-ui}"
       }
       service {
         name = "report-portal-ui"
@@ -403,17 +393,17 @@ RP_AMQP_APIPASS="{{ .Data.data.rabbit_user }}"
           "traefik.http.routers.ui.middlewares=ui-strip-prefix",
           "traefik.http.routers.ui.rule=PathPrefix(`/ui`)",
           "traefik.http.routers.ui.service=ui",
-          "traefik.http.routers.ui.entrypoints=web",
-          "traefik.http.routers.ui-secure.middlewares=ui-strip-prefix@consulCatalog",
+          "traefik.http.routers.ui.entrypoints=http",
+          "traefik.http.routers.ui-secure.middlewares=ui-strip-prefix",
           "traefik.http.routers.ui-secure.rule=PathPrefix(`/ui`)",
           "traefik.http.routers.ui-secure.service=ui",
           "traefik.http.routers.ui-secure.entrypoints=websecure",
-          "traefik.http.services.ui.loadbalancer.server.port=8080",
+          # "traefik.http.services.ui.loadbalancer.server.port=8080",
           "traefik.http.services.ui.loadbalancer.server.scheme=http",
           "traefik.http.routers.root.rule=PathPrefix(`/`)",
           "traefik.http.routers.root.priority=1",
           "traefik.http.routers.root.service=ui",
-          "traefik.http.routers.root.entrypoints=web",
+          "traefik.http.routers.root.entrypoints=http",
           "traefik.http.routers.root-secure.rule=PathPrefix(`/`)",
           "traefik.http.routers.root-secure.priority=1",
           "traefik.http.routers.root-secure.service=ui",
@@ -497,11 +487,11 @@ RP_INITIAL_ADMIN_PASSWORD={{ .Data.data.rp_initial_password }}
         tags = [
           "traefik.enable=true",
           "traefik.http.middlewares.api-strip-prefix.stripprefix.prefixes=/api",
-          "traefik.http.routers.api.middlewares=api-strip-prefix@consulCatalog",
+          "traefik.http.routers.api.middlewares=api-strip-prefix",
           "traefik.http.routers.api.rule=PathPrefix(`/api`)",
           "traefik.http.routers.api.service=api",
-          "traefik.http.routers.api.entrypoints=web",
-          "traefik.http.routers.api-secure.middlewares=api-strip-prefix@consulCatalog",
+          "traefik.http.routers.api.entrypoints=http",
+          "traefik.http.routers.api-secure.middlewares=api-strip-prefix",
           "traefik.http.routers.api-secure.rule=PathPrefix(`/api`)",
           "traefik.http.routers.api-secure.service=api",
           "traefik.http.routers.api-secure.entrypoints=websecure",
@@ -516,7 +506,7 @@ RP_INITIAL_ADMIN_PASSWORD={{ .Data.data.rp_initial_password }}
           interval = "30s"
           timeout  = "10s"
         }
-      } // service
-    }   // task
+      } // rp api service
+    }   // rp api task
   }     // group
 }       // job
