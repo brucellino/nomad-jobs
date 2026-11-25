@@ -1,6 +1,17 @@
 job "traefik-external" {
   type        = "service"
   datacenters = ["dc1"]
+  ui {
+    description = "Platform Ingress. Tag your services, expose them."
+    link {
+      url   = "https://doc.traefik.io/traefik/"
+      label = "docs"
+    }
+  }
+  meta {
+    repo           = "https://github.com/brucellino/nomad-jobs"
+    job-definition = "traefk.nomad.hcl"
+  }
   group "traefik" {
     network {
       port "http" {
@@ -82,12 +93,6 @@ entryPoints:
     address: ":{{ env "NOMAD_PORT_https" }}"
     http:
       tls: true
-# http:
-#   middlewares:
-#     redirect-https:
-#       redirectScheme:
-#         scheme: https
-#         permanent: true
 routers:
   dashboard:
     rule: PathPrefix(`/api`) || PathPrefix(`/dashboard`))
@@ -97,17 +102,12 @@ routers:
         certResolver: hah
       entryPoints:
         - http
-#       rule: "HostRegexp(`.+`)"
-#       middlewares:
-#         - redirect-https
-#       service: noop
-#       priority: 1
 api:
   dashboard: true
   insecure: true
-#
+
 ping: {}
-#
+
 providers:
   consulCatalog:
     endpoint:
