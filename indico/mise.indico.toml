@@ -4,13 +4,13 @@
 # debconf: DbDriver "passwords" warning: could not open /var/cache/debconf/passwords.dat: Permission denied
 # touch: cannot touch '/var/lib/update-notifier/dpkg-run-stamp': Permission denied
 from = "ubuntu:24.04"
-tag         = "ghcr.io/hashiatho.me/indico:v1"  # default tag for the built image
-workdir     = "/workspace"             # WORKDIR
-entrypoint  = []           # ENTRYPOINT
-cmd         = []                        # CMD
-user        = "1000:1000"                # USER
-user_id     = 1000                     # tar layer entry UID (file ownership)
-group_id    = 1000                      # tar layer entry GID (defaults to user_id)
+tag = "ghcr.io/hashiatho.me/indico:v1" # default tag for the built image
+workdir = "/workspace"                 # WORKDIR
+entrypoint = []                        # ENTRYPOINT
+cmd = []                               # CMD
+user = "1000:1000"                     # USER
+user_id = 1000                         # tar layer entry UID (file ownership)
+group_id = 1000                        # tar layer entry GID (defaults to user_id)
 mount_point = "/mise"
 
 [bootstrap.packages]
@@ -56,22 +56,25 @@ mode = "0755"
 
 [bootstrap.repos]
 "/opt/indico" = {
-  url = "https://github.com/indico/indico",
-  ref = "v3.3.13"
+
 }
 
+url = "https://github.com/indico/indico"
+ref = "v3.3.13"
 [tools]
 python = { version = "3.15.2" }
-uv = "0.13.9"
+uv = "0.13.10"
 
 [env]
-# Automatic virtualenv activation
 _.python.venv = {
     path = "/opt/indico/.venv",
-    create = true,
-    uv_create_args = ["--seed"]
+create = true,
+
+
 }
 
+# Automatic virtualenv activation
+uv_create_args = ["--seed"]
 [settings]
 python.uv_venv_auto = "create|source"
 
