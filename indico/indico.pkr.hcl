@@ -12,7 +12,7 @@ source "docker" "indico-base" {
   image = "ubuntu:24.04" // https://docs.getindico.io/en/stable/installation/production/deb/#debian-ubuntu
   commit = true
   changes = [
-    "USER indico"
+    "USER indico",
     "WORKDIR /opt/indico"
   ]
 }
@@ -47,6 +47,7 @@ build {
     inline = [
       "mise trust",
       "mise bootstrap",
+      "mise bootstrap packages apply",
       "mise tasks run install"
     ]
   }
@@ -57,16 +58,6 @@ build {
       "mise doctor"
     ]
   }
-
-  # provisioner  "shell" {
-  #   # Get indico
-  #   inline = [
-  #     "cd /indico",
-  #     # "git clone --branch v3.3.13 --depth 1 --bare https://github.com/indico/indico",
-  #     "ls -lhta",
-  #     "mise tasks run install"
-  #   ]
-  # }
   post-processors {
     post-processor "docker-tag" {
       repository = "ghcr.io/hashi-at-home/indico"
