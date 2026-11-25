@@ -63,10 +63,16 @@ job "report-portal-services" {
       port "report-portal-api" {
         static = 8585
       }
+      port "report-portal-analyzer" {
+        static = 5001
+      }
       port "report-portal-ui" {}
     }
     task "gateway" {
       vault {}
+      lifecycle {
+        hook = "prestart"
+      }
       resources {
         cpu    = 100
         memory = 256
@@ -120,6 +126,9 @@ EOF
 
     }
     task "postgres" {
+      lifecycle {
+        hook = "prestart"
+      }
       vault {}
       resources {
         cpu    = 200
@@ -160,6 +169,9 @@ POSTGRES_DB="reportportal"
     }
 
     task "rabbit" {
+      lifecycle {
+        hook = "prestart"
+      }
       vault {}
       shutdown_delay = "10s"
       resources {
@@ -221,6 +233,9 @@ RABBITMQ_ERLANG_COOKIE=reportportal
     }
 
     task "opensearch" {
+      lifecycle {
+        hook = "prestart"
+      }
       vault {}
       shutdown_delay = "30s"
 
@@ -259,9 +274,6 @@ DISABLE_INSTALL_DEMO_CONFIG="true"
 
     task "migrations" {
       vault {}
-      lifecycle {
-        hook = "poststart"
-      }
       driver = "docker"
       config {
         image = "reportportal/migrations:6.0.0"
@@ -508,5 +520,37 @@ RP_INITIAL_ADMIN_PASSWORD={{ .Data.data.rp_initial_password }}
         }
       } // rp api service
     }   // rp api task
-  }     // group
-}       // job
+
+    task "analyzer" {
+      vault {}
+      driver = "docker"
+      lifecycle {
+        hook = "poststart"
+      }
+      resources {
+        cpu    = 250
+        memory = 1024
+      }
+      config {
+        image = "reportportal/service-auto-analyzer:6.0.0"
+        ports = ["report-portal-analyzer"]
+      }
+      template {
+        data        = <<EOT
+{{- with secret "hashiatho.me-v2/report_portal" }}
+AMQP_URL=amqp://{{ .Data.data.rabbit_user }}:{{ .Data.data.rabbit_pass }}@{{ env "NOMAD_IP_rabbitmq" }}:{{ env "NOMAD_PORT_rabbitmq" }}
+{{ end -}}
+        EOT
+        destination = "local/analyzer.env"
+        env         = true
+      }
+      env {
+        LOGGING_LEVEL           = "info"
+        AMQP_EXCHANGE_NAME      = "analyzer-default"
+        AMQP_VIRTUAL_HOST       = "analyzer"
+        ES_HOSTS                = "http://${NOMAD_IP_opensearch}:${NOMAD_PORT_opensearch}"
+        FILESYSTEM_DEFAULT_PATH = "/data/storage/analyzer"
+      }
+    }
+  } // group
+}   // job
