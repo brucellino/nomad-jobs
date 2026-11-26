@@ -27,21 +27,21 @@
 # https://github.com/indico/indico-containers/blob/master/indico-prod/worker/Dockerfile
 [bootstrap.groups.indico]
 system = false
-gid = 999
+gid = 1002
 
 [bootstrap.groups.www-data]
 system = false
-gid = 997
+gid = 1003
 
 [bootstrap.users.indico]
 system = false
-uid = 999
+uid = 1002
 group = "indico"
 groups = ["indico", "www-data"]
 home = "/opt/indico"
 
 
-[bootstrap.directories."/indico"]
+[bootstrap.directories."/opt/indico"]
 owner = "indico"
 group = "indico"
 mode = "0755"
@@ -67,4 +67,7 @@ run = "uv pip install uwsgi"
 depends = ['uwsgi']
 description = "Install dependencies"
 alias = "i"
-run = "uv pip install -r requirements.txt"
+run = """
+uv pip install -r requirements.txt
+chown -Rvf indico:indico /opt/indico
+""""

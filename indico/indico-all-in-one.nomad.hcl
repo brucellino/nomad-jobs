@@ -1,13 +1,21 @@
 // Indico job definition modelled as 3-tier workload
 // Each tier gets a group
 job "indico" {
+  vault {}
+  secret "github" {
+    provider = "vault"
+    path     = "hashiatho.me-v2/github"
+    config {
+      engine = "kv_v2"
+    }
+  }
   group "frontend" {
     network {
       port "http" {
         to = 80
       }
       port "redis" {
-        to = 6379
+        static = 6379
       }
     }
 
@@ -47,6 +55,10 @@ job "indico" {
     count = 1
     // serves user requests, exposed to internet. Low resources
     task "nginx" {
+      resources {
+        cpu    = 100
+        memory = 256
+      }
       driver         = "docker"
       shutdown_delay = "30s"
       config {
@@ -73,6 +85,10 @@ job "indico" {
       }
     }
     task "redis" {
+      resources {
+        cpu    = 100
+        memory = 256
+      }
       driver         = "docker"
       shutdown_delay = "30s"
       config {
@@ -92,38 +108,117 @@ job "indico" {
     }
   }
 
-  # group "application" {
-  #   count = 1
-  #   // Runs the actual application. High resources, disposable
-  #   task "indico" {
-  #     driver = "docker"
-  #     image = "ghcr.io/hashi-at-home/indico" # We need to build this
+  #   group "application" {
+  #     count = 1
+  #
+  #     // Runs the actual application. High resources, disposable
+  # #     task "indico" {
+  # #       resources {
+  # #         cpu = 1000
+  # #         memory = 1024
+  # #       }
+  # #       driver = "docker"
+  # #       config {
+  # #         image = "ghcr.io/hashi-at-home/indico" # We need to build this
+  # #         auth {
+  # #           username = "brucellino"
+  # #           password = "${secret.github.ghcr_token}"
+  # #         }
+  # #       }
+  # #
+  # #     }
   #   }
-  # }
 
   group "backend" {
+    network {
+      port "pg18" {
+        to = "5432"
+      }
+      port "celery" {
+        to = 5672
+      }
+    }
     count = 1
     // Handles events and persists data, high reliability and elasticity
-    # task "celery" {
-    #   count = 1 // let's scale this guy eventually
-    #   driver = "docker"
-    #   # Reuse the same indico image as before, since it has celery
-    #   # configured on it
-    #   image = "ghcr.io/hashi-at-home/indico"
-    # }
+    task "celery" {
+      vault {}
+      driver = "docker"
+      # Reuse the same indico image as before, since it has celery
+      # configured on it
+      config {
+        image   = "ghcr.io/hashi-at-home/indico:latest"
+        command = "/local/run-celery.sh"
+        ports   = ["celery"]
+        auth {
+          username = "brucellino"
+          password = "${secret.github.ghcr_token}"
+        }
+      }
+      template {
+        data        = <<EOT
+INDICO_CONFIG=local/indico.conf /opt/indico/.venv/bin/indico celery worker -B
+      EOT
+        destination = "local/run-celery.sh"
+        perms       = "0777"
+      }
+      template {
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/indico" }}
+# General settings
+SQLALCHEMY_DATABASE_URI = 'postgresql://{{ .Data.data.db_user }}:{{ .Data.data.db_pass }}@{{ env "NOMAD_IP_pg18" }}:{{ env "NOMAD_PORT_pg18" }}/indico'
+SECRET_KEY = b'Kb\xca\xe1O\xad\x00>\x96\xfctx\x9b^DX\x9f\x08\xfb\x86\xe2\x08ckg\xbb\xea\xd6t\xf1\xbb\x82'
+CELERY_BROKER = 'redis://indico-redis-frontend.service.consul:6379/0'
+REDIS_CACHE_URL = 'redis://indico-redis-frontend.service.consul:6379/1'
+DEFAULT_TIMEZONE = 'Europe/Rome'
+DEFAULT_LOCALE = 'en_GB'
+ENABLE_ROOMBOOKING = False
+CACHE_DIR = '/opt/indico/cache'
+TEMP_DIR = '/opt/indico/tmp'
+LOG_DIR = '/opt/indico/log'
+LOCAL_PASSWORD_MIN_LENGTH = 15
+CSP_ENABLED = True
+STORAGE_BACKENDS = {'default': 'fs:local/archive'}
+ATTACHMENT_STORAGE = 'default'
 
-    task "db" {
+# Email settings
+SMTP_SERVER = ('lol.com', 25)
+SMTP_USE_TLS = True
+SMTP_LOGIN = '{{ .Data.data.smtp_login }}'
+SMTP_PASSWORD = '{{ .Data.data.smtp_password }}'
+SUPPORT_EMAIL = 'lol@nope.com'
+PUBLIC_SUPPORT_EMAIL = 'lol@nope.com'
+NO_REPLY_EMAIL = 'noreply@nope.com'
+{{ end }}
+        EOT
+        destination = "local/indico.conf"
+      }
+    }
+    #
+
+    task "db18" {
+      vault {}
       # This one is debatable - deploying the database together with the app
       # May be a recipe for disaster if things die.
       # Better to have an external database in prod
+      resources {
+        cpu    = 100
+        memory = 1024
+      }
       driver = "docker"
       config {
         image = "postgres:18-alpine"
+        ports = ["pg18"]
       }
-      env {
-        POSTGRES_PASSWORD = "postgres" # pragma: allowlist secret
-        POSTGRES_USER     = "postgres"
-        POSTGRES_DB       = "indico"
+      template {
+        data        = <<EOT
+{{ with secret "hashiatho.me-v2/indico" }}
+POSTGRES_PASSWORD={{ .Data.data.db_pass }}
+POSTGRES_USER={{ .Data.data.db_user }}
+POSTGRES_DB="indico"
+{{ end }}
+        EOT
+        destination = "local/db.env"
+        env         = true
       }
     }
   }
