@@ -14,7 +14,7 @@ Indico is a python flask application served by uwsgi.
 
 It is backed by
 
-* a database
+* a postgres database
 * a redis cache
 * a celery task queue
 

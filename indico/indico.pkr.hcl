@@ -8,17 +8,33 @@ packer {
   }
 }
 
-source "docker" "indico-base" {
+local "github_token" {
+  expression = vault("hashiatho.me-v2/data/github", "indicotoken")
+  sensitive = true
+}
+source "docker" "indico-base-amd64" {
   image = "ubuntu:24.04" // https://docs.getindico.io/en/stable/installation/production/deb/#debian-ubuntu
   commit = true
+  platform = "linux/amd64" #linux/arm64
   changes = [
-    "USER indico"
+    "ENTRYPOINT /bin/bash",
+    "USER indico",
+    "WORKDIR /opt/indico"
+  ]
+}
+source "docker" "indico-base-arm64" {
+  image = "ubuntu:24.04" // https://docs.getindico.io/en/stable/installation/production/deb/#debian-ubuntu
+  commit = true
+  platform = "linux/arm64"
+  changes = [
+    "ENTRYPOINT /bin/bash",
+    "USER indico",
     "WORKDIR /opt/indico"
   ]
 }
 
 build {
-  sources = ["source.docker.indico-base"]
+  sources = ["source.docker.indico-base-amd64", "source.docker.indico-base-arm64"]
 
   # Add mise
   provisioner "shell" {
@@ -47,6 +63,7 @@ build {
     inline = [
       "mise trust",
       "mise bootstrap",
+      "mise bootstrap packages apply",
       "mise tasks run install"
     ]
   }
@@ -57,20 +74,16 @@ build {
       "mise doctor"
     ]
   }
-
-  # provisioner  "shell" {
-  #   # Get indico
-  #   inline = [
-  #     "cd /indico",
-  #     # "git clone --branch v3.3.13 --depth 1 --bare https://github.com/indico/indico",
-  #     "ls -lhta",
-  #     "mise tasks run install"
-  #   ]
-  # }
   post-processors {
     post-processor "docker-tag" {
       repository = "ghcr.io/hashi-at-home/indico"
       tags = ["latest"]
+    }
+    post-processor "docker-push" {
+      login = true
+      login_server = "ghcr.io"
+      login_username = "brucellino"
+      login_password = local.github_token
     }
   }
 }
