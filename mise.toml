@@ -11,6 +11,6 @@ rclone = "1.76.0"
 # Documentation
 d2 = "0.9.0"
 # Pre-commit hooks
-prek = "0.5.11"
+prek = "0.5.12"
 
 [tasks]
